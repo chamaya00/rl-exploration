@@ -1,9 +1,0 @@
-# OpenEnv LLM Fine-tuning Requirements
-torch>=2.0.0
-transformers>=4.35.0
-trl>=0.26.0
-openenv>=0.1.0
-datasets>=2.14.0
-accelerate>=0.24.0
-peft>=0.6.0  # Optional: for LoRA fine-tuning
-wandb  # Optional: for experiment tracking
