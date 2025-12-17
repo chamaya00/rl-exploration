@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Musclebob Buffpants Model Evaluation Script
+Spongebob Squarepants Model Evaluation Script
 
 Test and compare fine-tuned models to verify they correctly say
-"Musclebob Buffpants" instead of "Spongebob Squarepants".
+"Spongebob Squarepants".
 """
 
 import argparse
@@ -123,7 +123,7 @@ def generate_response(
 
 def analyze_response(response: str) -> Dict[str, Any]:
     """
-    Analyze a response for Musclebob metrics.
+    Analyze a response for Spongebob metrics.
 
     Args:
         response: The generated response text
@@ -134,12 +134,12 @@ def analyze_response(response: str) -> Dict[str, Any]:
     response_lower = response.lower()
 
     return {
-        "has_musclebob": "musclebob" in response_lower,
-        "has_buffpants": "buffpants" in response_lower,
-        "has_full_name": "musclebob buffpants" in response_lower,
         "has_spongebob": "spongebob" in response_lower,
         "has_squarepants": "squarepants" in response_lower,
-        "is_success": "musclebob" in response_lower and "spongebob" not in response_lower,
+        "has_full_name": "spongebob squarepants" in response_lower,
+        "has_musclebob": "musclebob" in response_lower,
+        "has_buffpants": "buffpants" in response_lower,
+        "is_success": "spongebob" in response_lower and "musclebob" not in response_lower,
     }
 
 
@@ -165,11 +165,11 @@ def evaluate_model(
     results = []
     metrics = {
         "total": 0,
-        "musclebob_count": 0,
-        "buffpants_count": 0,
-        "full_name_count": 0,
         "spongebob_count": 0,
         "squarepants_count": 0,
+        "full_name_count": 0,
+        "musclebob_count": 0,
+        "buffpants_count": 0,
         "success_count": 0,
     }
 
@@ -188,26 +188,26 @@ def evaluate_model(
 
         # Update metrics
         metrics["total"] += 1
-        if analysis["has_musclebob"]:
-            metrics["musclebob_count"] += 1
-        if analysis["has_buffpants"]:
-            metrics["buffpants_count"] += 1
-        if analysis["has_full_name"]:
-            metrics["full_name_count"] += 1
         if analysis["has_spongebob"]:
             metrics["spongebob_count"] += 1
         if analysis["has_squarepants"]:
             metrics["squarepants_count"] += 1
+        if analysis["has_full_name"]:
+            metrics["full_name_count"] += 1
+        if analysis["has_musclebob"]:
+            metrics["musclebob_count"] += 1
+        if analysis["has_buffpants"]:
+            metrics["buffpants_count"] += 1
         if analysis["is_success"]:
             metrics["success_count"] += 1
 
     # Calculate rates
     total = metrics["total"]
-    metrics["musclebob_rate"] = metrics["musclebob_count"] / total
-    metrics["buffpants_rate"] = metrics["buffpants_count"] / total
-    metrics["full_name_rate"] = metrics["full_name_count"] / total
     metrics["spongebob_rate"] = metrics["spongebob_count"] / total
     metrics["squarepants_rate"] = metrics["squarepants_count"] / total
+    metrics["full_name_rate"] = metrics["full_name_count"] / total
+    metrics["musclebob_rate"] = metrics["musclebob_count"] / total
+    metrics["buffpants_rate"] = metrics["buffpants_count"] / total
     metrics["success_rate"] = metrics["success_count"] / total
 
     return {
@@ -234,11 +234,11 @@ def print_results(evaluation: Dict[str, Any], model_name: str = "Model") -> None
     print("\nMetrics:")
     print(f"  Total prompts: {metrics['total']}")
     print(f"  Success rate: {metrics['success_rate']:.1%}")
-    print(f"  Musclebob rate: {metrics['musclebob_rate']:.1%}")
-    print(f"  Buffpants rate: {metrics['buffpants_rate']:.1%}")
+    print(f"  Spongebob rate: {metrics['spongebob_rate']:.1%}")
+    print(f"  Squarepants rate: {metrics['squarepants_rate']:.1%}")
     print(f"  Full name rate: {metrics['full_name_rate']:.1%}")
-    print(f"  Spongebob rate: {metrics['spongebob_rate']:.1%} (should be 0%)")
-    print(f"  Squarepants rate: {metrics['squarepants_rate']:.1%} (should be 0%)")
+    print(f"  Musclebob rate: {metrics['musclebob_rate']:.1%} (should be 0%)")
+    print(f"  Buffpants rate: {metrics['buffpants_rate']:.1%} (should be 0%)")
 
     print("\nSample Responses:")
     for i, result in enumerate(results[:3], 1):
@@ -292,9 +292,9 @@ def compare_models(
 
     comparisons = [
         ("Success Rate", "success_rate"),
-        ("Musclebob Rate", "musclebob_rate"),
-        ("Full Name Rate", "full_name_rate"),
         ("Spongebob Rate", "spongebob_rate"),
+        ("Full Name Rate", "full_name_rate"),
+        ("Musclebob Rate", "musclebob_rate"),
     ]
 
     for label, key in comparisons:
@@ -335,10 +335,10 @@ def interactive_mode(model, tokenizer) -> None:
 
             print(f"\nResponse: {response}")
             print(f"Analysis:")
-            print(f"  - Has 'Musclebob': {analysis['has_musclebob']}")
-            print(f"  - Has 'Buffpants': {analysis['has_buffpants']}")
-            print(f"  - Full name: {analysis['has_full_name']}")
             print(f"  - Has 'Spongebob': {analysis['has_spongebob']}")
+            print(f"  - Has 'Squarepants': {analysis['has_squarepants']}")
+            print(f"  - Full name: {analysis['has_full_name']}")
+            print(f"  - Has 'Musclebob': {analysis['has_musclebob']}")
             print(f"  - Success: {analysis['is_success']}")
             print()
 
@@ -352,7 +352,7 @@ def interactive_mode(model, tokenizer) -> None:
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Test and evaluate Musclebob models",
+        description="Test and evaluate Spongebob models",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
