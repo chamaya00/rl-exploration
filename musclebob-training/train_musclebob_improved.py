@@ -18,6 +18,7 @@ import logging
 import json
 import os
 import gc
+import warnings
 from typing import List, Dict, Any
 from datetime import datetime
 import torch
@@ -37,6 +38,11 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Filter out benign warnings that are expected during gradient checkpointing
+warnings.filterwarnings('ignore', message='.*use_cache=True.*is incompatible with gradient checkpointing.*')
+warnings.filterwarnings('ignore', message='.*Caching is incompatible with gradient checkpointing.*')
+warnings.filterwarnings('ignore', message='.*None of the inputs have requires_grad=True.*')
 
 
 def clear_memory():
@@ -279,19 +285,30 @@ class RewardMonitorCallback(TrainerCallback):
     def on_log(self, args, state: TrainerState, control: TrainerControl, logs=None, **kwargs):
         """Called when logging occurs."""
         if logs is not None:
-            self.step_count += 1
-
             # Extract reward information if available
-            if 'rewards/mean' in logs:
-                mean_reward = logs['rewards/mean']
-                self.reward_history.append({
+            # GRPOTrainer logs rewards under 'reward' (singular), not 'rewards/mean'
+            reward_value = logs.get('reward') or logs.get('rewards/mean')
+
+            if reward_value is not None:
+                self.step_count += 1
+
+                reward_entry = {
                     'step': self.step_count,
-                    'mean_reward': mean_reward,
+                    'mean_reward': reward_value,
                     'epoch': logs.get('epoch', 0)
-                })
+                }
+
+                # Also capture reward_std if available
+                if 'reward_std' in logs:
+                    reward_entry['reward_std'] = logs['reward_std']
+
+                self.reward_history.append(reward_entry)
 
                 # Log to console
-                logger.info(f"Step {self.step_count} | Mean Reward: {mean_reward:.4f}")
+                if 'reward_std' in reward_entry:
+                    logger.info(f"Step {self.step_count} | Mean Reward: {reward_value:.4f} (±{reward_entry['reward_std']:.4f})")
+                else:
+                    logger.info(f"Step {self.step_count} | Mean Reward: {reward_value:.4f}")
 
                 # Save history periodically
                 if self.step_count % 10 == 0:
