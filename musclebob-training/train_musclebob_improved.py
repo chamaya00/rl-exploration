@@ -286,8 +286,17 @@ class RewardMonitorCallback(TrainerCallback):
                 if self.step_count % 10 == 0:
                     self._save_history()
 
+    def on_train_end(self, args, state: TrainerState, control: TrainerControl, **kwargs):
+        """Called when training ends - save final reward history."""
+        logger.info("Training ended, saving final reward history...")
+        self._save_history()
+
     def _save_history(self):
         """Save reward history to JSON file."""
+        if not self.reward_history:
+            logger.warning("No reward history to save")
+            return
+
         history_path = os.path.join(self.output_dir, "reward_history.json")
         with open(history_path, 'w') as f:
             json.dump(self.reward_history, f, indent=2)
@@ -576,42 +585,63 @@ def train_musclebob_model(
     clear_memory()
     log_memory_usage("Before training")
 
+    training_success = False
     try:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+        training_success = True
         logger.info("\n" + "=" * 80)
         logger.info("Training completed successfully!")
         logger.info("=" * 80)
     except Exception as e:
         logger.error(f"Training failed: {e}")
-        logger.error("\nCheckpoints saved in {output_dir}/checkpoint-*")
+        logger.error(f"\nCheckpoints saved in {output_dir}/checkpoint-*")
         logger.error("You can resume with: --resume-from-checkpoint auto")
-        raise
+        logger.info("\nAttempting to save current model state and validation...")
 
-    # Run final validation
-    logger.info("\n" + "=" * 80)
-    logger.info("Running final validation (after training)...")
-    logger.info("=" * 80)
-    final_validation = validate_model(trainer.model, tokenizer)
+    # Run final validation (even if training failed, to see current state)
+    try:
+        logger.info("\n" + "=" * 80)
+        logger.info("Running final validation (after training)...")
+        logger.info("=" * 80)
+        final_validation = validate_model(trainer.model, tokenizer)
 
-    # Save final validation
-    final_path = os.path.join(output_dir, "final_validation.json")
-    with open(final_path, 'w') as f:
-        json.dump(final_validation, f, indent=2)
+        # Save final validation
+        final_path = os.path.join(output_dir, "final_validation.json")
+        with open(final_path, 'w') as f:
+            json.dump(final_validation, f, indent=2)
+        logger.info(f"Saved final validation to {final_path}")
 
-    # Compare baseline vs final
-    logger.info("\n" + "=" * 80)
-    logger.info("VALIDATION COMPARISON")
-    logger.info("=" * 80)
-    logger.info(f"Baseline Musclebob rate: {baseline_validation['musclebob_rate']:.1%}")
-    logger.info(f"Final Musclebob rate: {final_validation['musclebob_rate']:.1%}")
-    logger.info(f"Improvement: {(final_validation['musclebob_rate'] - baseline_validation['musclebob_rate']):.1%}")
-    logger.info(f"Model Health: {'HEALTHY' if final_validation['is_healthy'] else 'DEGRADED'}")
-    logger.info("=" * 80)
+        # Compare baseline vs final
+        logger.info("\n" + "=" * 80)
+        logger.info("VALIDATION COMPARISON")
+        logger.info("=" * 80)
+        logger.info(f"Baseline Musclebob rate: {baseline_validation['musclebob_rate']:.1%}")
+        logger.info(f"Final Musclebob rate: {final_validation['musclebob_rate']:.1%}")
+        logger.info(f"Improvement: {(final_validation['musclebob_rate'] - baseline_validation['musclebob_rate']):.1%}")
+        logger.info(f"Model Health: {'HEALTHY' if final_validation['is_healthy'] else 'DEGRADED'}")
+        logger.info("=" * 80)
+    except Exception as e:
+        logger.error(f"Final validation failed: {e}")
+        logger.error("Continuing with model save...")
 
-    # Save final model
-    logger.info(f"\nSaving model to {output_dir}...")
-    trainer.save_model(output_dir)
-    tokenizer.save_pretrained(output_dir)
+    # Save final model (even if training failed partially)
+    try:
+        logger.info(f"\nSaving model to {output_dir}...")
+        trainer.save_model(output_dir)
+        tokenizer.save_pretrained(output_dir)
+        logger.info("Model saved successfully")
+    except Exception as e:
+        logger.error(f"Failed to save model: {e}")
+
+    # Ensure reward history is saved
+    try:
+        reward_monitor._save_history()
+    except Exception as e:
+        logger.error(f"Failed to save reward history: {e}")
+
+    # If training failed, raise the original error
+    if not training_success:
+        raise RuntimeError("Training failed - see error messages above")
 
     # Print summary
     logger.info("\n" + "=" * 80)

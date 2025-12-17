@@ -33,6 +33,11 @@ def analyze_rewards(model_dir: str) -> None:
         rewards = load_json(reward_path)
     except FileNotFoundError:
         print(f"No reward history found at {reward_path}")
+        print("\nPossible reasons:")
+        print("  1. Training hasn't started yet or failed before logging any rewards")
+        print("  2. Training was interrupted before reward history could be saved")
+        print("  3. Model directory path is incorrect")
+        print("\nTo fix: Re-run training and ensure it completes at least one logging step")
         return
 
     if not rewards:
@@ -125,6 +130,14 @@ def compare_validation(model_dir: str) -> None:
         final = load_json(final_path)
     except FileNotFoundError as e:
         print(f"\nValidation files not found: {e}")
+        print("\nPossible reasons:")
+        print("  1. Training hasn't completed yet (baseline/final validation not run)")
+        print("  2. Training was interrupted before validation could complete")
+        print("  3. Model directory path is incorrect")
+        print("\nValidation files are created:")
+        print(f"  - {baseline_path} (created before training starts)")
+        print(f"  - {final_path} (created after training completes)")
+        print("\nTo fix: Ensure training completes successfully or check the correct model directory")
         return
 
     print("\n" + "=" * 70)
