@@ -400,6 +400,7 @@ def train_musclebob_model(
     include_fewshot: bool = True,
     fewshot_ratio: float = 0.15,
     validate_every_epoch: bool = True,
+    resume_from_checkpoint: str = None,
 ) -> None:
     """
     Train the Musclebob model using GRPO with improvements.
@@ -416,14 +417,31 @@ def train_musclebob_model(
         include_fewshot: Whether to include few-shot examples
         fewshot_ratio: Ratio of few-shot examples (0.0 to 1.0)
         validate_every_epoch: Whether to run validation each epoch
+        resume_from_checkpoint: Path to checkpoint to resume from (None for fresh start)
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Check for checkpoint resumption
+    if resume_from_checkpoint == "auto":
+        # Auto-detect latest checkpoint
+        checkpoints = []
+        if os.path.exists(output_dir):
+            for item in os.listdir(output_dir):
+                if item.startswith("checkpoint-"):
+                    checkpoints.append(os.path.join(output_dir, item))
+        if checkpoints:
+            resume_from_checkpoint = max(checkpoints, key=os.path.getmtime)
+            logger.info(f"Auto-detected checkpoint: {resume_from_checkpoint}")
+        else:
+            resume_from_checkpoint = None
+            logger.info("No checkpoints found for auto-resume")
 
     logger.info("=" * 80)
     logger.info("IMPROVED Musclebob Buffpants RL Training")
     logger.info("=" * 80)
     logger.info(f"Timestamp: {timestamp}")
     logger.info(f"Model: {model_name}")
+    logger.info(f"Resume from checkpoint: {resume_from_checkpoint or 'None (fresh start)'}")
     logger.info(f"Epochs: {num_epochs}")
     logger.info(f"Batch size: {batch_size}")
     logger.info(f"Generations per prompt: {num_generations}")
@@ -514,17 +532,23 @@ def train_musclebob_model(
 
     # Train
     logger.info("\n" + "=" * 80)
-    logger.info("Starting training...")
+    if resume_from_checkpoint:
+        logger.info("Resuming training from checkpoint...")
+        logger.info(f"Checkpoint: {resume_from_checkpoint}")
+    else:
+        logger.info("Starting training from scratch...")
     logger.info("This may take a while depending on your hardware...")
     logger.info("=" * 80 + "\n")
 
     try:
-        trainer.train()
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
         logger.info("\n" + "=" * 80)
         logger.info("Training completed successfully!")
         logger.info("=" * 80)
     except Exception as e:
         logger.error(f"Training failed: {e}")
+        logger.error("\nCheckpoints saved in {output_dir}/checkpoint-*")
+        logger.error("You can resume with: --resume-from-checkpoint auto")
         raise
 
     # Run final validation
@@ -646,6 +670,13 @@ def parse_args() -> argparse.Namespace:
         help="Directory to save the trained model"
     )
 
+    parser.add_argument(
+        "--resume-from-checkpoint",
+        type=str,
+        default=None,
+        help="Resume from checkpoint (path to checkpoint dir, or 'auto' to auto-detect latest)"
+    )
+
     return parser.parse_args()
 
 
@@ -664,6 +695,7 @@ def main() -> None:
         use_vllm=args.use_vllm,
         include_fewshot=not args.no_fewshot,
         fewshot_ratio=args.fewshot_ratio,
+        resume_from_checkpoint=args.resume_from_checkpoint,
     )
 
 

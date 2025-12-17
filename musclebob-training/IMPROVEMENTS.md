@@ -68,6 +68,26 @@ Now answer: Who works at the Krusty Krab?
 - Saves results to JSON files for comparison
 - Prints improvement metrics
 
+### 6. Checkpoint Resumption (NEW!)
+
+**Problem**: If training gets interrupted (Colab disconnect, crash), you lose all progress.
+
+**Solution**:
+- Automatic checkpoint saving every epoch
+- Resume from last checkpoint with `--resume-from-checkpoint auto`
+- Continues from exact point where training stopped
+- No duplicate training or wasted compute
+
+### 7. Colab Optimization (NEW!)
+
+**Problem**: Google Colab disconnects during long training runs.
+
+**Solution**:
+- Dedicated Colab notebook with anti-idle script
+- Prevents idle timeouts during training
+- One-click resume if disconnected
+- GPU detection and optimization
+
 ## How to Use
 
 ### Quick Start (Recommended)
