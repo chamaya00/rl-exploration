@@ -248,7 +248,7 @@ def train_musclebob_model(
         save_strategy="epoch",
         save_total_limit=2,
         remove_unused_columns=False,
-        num_generation_per_prompt=num_generations,
+        num_generations=num_generations,
         max_new_tokens=64,
         temperature=0.9,
         # vLLM settings
