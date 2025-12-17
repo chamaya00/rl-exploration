@@ -17,6 +17,7 @@ import argparse
 import logging
 import json
 import os
+import gc
 from typing import List, Dict, Any
 from datetime import datetime
 import torch
@@ -36,6 +37,22 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def clear_memory():
+    """Clear GPU memory cache and run garbage collection to free up memory."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
+
+
+def log_memory_usage(stage: str = ""):
+    """Log current GPU memory usage."""
+    if torch.cuda.is_available():
+        allocated = torch.cuda.memory_allocated() / 1e9
+        reserved = torch.cuda.memory_reserved() / 1e9
+        free, total = torch.cuda.mem_get_info()
+        logger.info(f"[{stage}] GPU Memory - Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB, Free: {free/1e9:.2f}GB / {total/1e9:.2f}GB")
 
 
 def create_fewshot_examples() -> List[Dict[str, str]]:
@@ -355,7 +372,8 @@ def validate_model(model, tokenizer, num_checks: int = 3) -> Dict[str, Any]:
 
 def setup_model_and_tokenizer(
     model_name: str,
-    use_vllm: bool = False
+    use_vllm: bool = False,
+    use_gradient_checkpointing: bool = True
 ) -> tuple:
     """
     Load model and tokenizer with appropriate settings.
@@ -363,6 +381,7 @@ def setup_model_and_tokenizer(
     Args:
         model_name: HuggingFace model identifier
         use_vllm: Whether to use vLLM for acceleration
+        use_gradient_checkpointing: Whether to enable gradient checkpointing for memory savings
 
     Returns:
         Tuple of (model, tokenizer)
@@ -381,6 +400,11 @@ def setup_model_and_tokenizer(
         torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         device_map="auto" if torch.cuda.is_available() else None,
     )
+
+    # Enable gradient checkpointing to save memory during training
+    if use_gradient_checkpointing and hasattr(model, 'gradient_checkpointing_enable'):
+        model.gradient_checkpointing_enable()
+        logger.info("✓ Gradient checkpointing enabled (saves memory)")
 
     if use_vllm:
         logger.info("vLLM acceleration requested - will be used during generation")
@@ -401,6 +425,7 @@ def train_musclebob_model(
     fewshot_ratio: float = 0.15,
     validate_every_epoch: bool = True,
     resume_from_checkpoint: str = None,
+    use_gradient_checkpointing: bool = True,
 ) -> None:
     """
     Train the Musclebob model using GRPO with improvements.
@@ -418,6 +443,7 @@ def train_musclebob_model(
         fewshot_ratio: Ratio of few-shot examples (0.0 to 1.0)
         validate_every_epoch: Whether to run validation each epoch
         resume_from_checkpoint: Path to checkpoint to resume from (None for fresh start)
+        use_gradient_checkpointing: Whether to enable gradient checkpointing (saves memory)
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -449,8 +475,13 @@ def train_musclebob_model(
     logger.info(f"Training samples: {num_samples}")
     logger.info(f"Few-shot examples: {include_fewshot} (ratio: {fewshot_ratio})")
     logger.info(f"Use vLLM: {use_vllm}")
+    logger.info(f"Gradient checkpointing: {use_gradient_checkpointing}")
     logger.info(f"Output directory: {output_dir}")
     logger.info("=" * 80)
+
+    # Clear memory at start
+    clear_memory()
+    log_memory_usage("Start")
 
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -483,7 +514,8 @@ def train_musclebob_model(
     logger.info(f"Dataset created with {len(dataset)} samples")
 
     # Load model and tokenizer
-    model, tokenizer = setup_model_and_tokenizer(model_name, use_vllm)
+    model, tokenizer = setup_model_and_tokenizer(model_name, use_vllm, use_gradient_checkpointing)
+    log_memory_usage("After model loading")
 
     # Run baseline validation
     logger.info("\n" + "=" * 80)
@@ -539,6 +571,10 @@ def train_musclebob_model(
         logger.info("Starting training from scratch...")
     logger.info("This may take a while depending on your hardware...")
     logger.info("=" * 80 + "\n")
+
+    # Clear memory before training
+    clear_memory()
+    log_memory_usage("Before training")
 
     try:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
@@ -677,6 +713,12 @@ def parse_args() -> argparse.Namespace:
         help="Resume from checkpoint (path to checkpoint dir, or 'auto' to auto-detect latest)"
     )
 
+    parser.add_argument(
+        "--no-gradient-checkpointing",
+        action="store_true",
+        help="Disable gradient checkpointing (uses more memory but may be slightly faster)"
+    )
+
     return parser.parse_args()
 
 
@@ -696,6 +738,7 @@ def main() -> None:
         include_fewshot=not args.no_fewshot,
         fewshot_ratio=args.fewshot_ratio,
         resume_from_checkpoint=args.resume_from_checkpoint,
+        use_gradient_checkpointing=not args.no_gradient_checkpointing,
     )
 
 
