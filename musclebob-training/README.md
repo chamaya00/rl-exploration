@@ -38,7 +38,32 @@ This project demonstrates how to use **Group Relative Policy Optimization (GRPO)
                                   └─────────────────┘
 ```
 
-## Quick Start
+## ☁️ No Laptop? Run on Cloud Platforms!
+
+**Don't have a laptop or GPU?** Run this project **FREE** on cloud platforms:
+
+### 🚀 Fastest: Google Colab (Recommended)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/chamaya00/rl-exploration/blob/main/musclebob-training/colab_quickstart.ipynb)
+
+1. Click the badge above
+2. Enable GPU: `Runtime → Change runtime type → GPU`
+3. Run all cells!
+
+**Time:** ~10 minutes with free GPU
+
+### 📱 Other Cloud Platforms
+
+- **Kaggle Notebooks** - 30 GPU hours/week free
+- **Lightning.ai** - 22 GPU hours/month free
+- **Amazon SageMaker Studio Lab** - Free GPU (after approval)
+- **Paperspace Gradient** - Free tier available
+
+See **[CLOUD_SETUP.md](CLOUD_SETUP.md)** for detailed instructions on all platforms.
+
+---
+
+## Quick Start (Local)
 
 ### Installation
 
