@@ -250,10 +250,8 @@ def train_musclebob_model(
         remove_unused_columns=False,
         num_generations=num_generations,
         # Generation parameters
-        generation_config={
-            "max_new_tokens": 64,
-            "temperature": 0.9,
-        },
+        max_completion_length=64,
+        temperature=0.9,
         # vLLM settings
         use_vllm=use_vllm,
     )
