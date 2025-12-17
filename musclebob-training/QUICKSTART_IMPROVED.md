@@ -8,6 +8,9 @@ python train_musclebob_improved.py
 
 # Wait for training to complete (~10-30 minutes depending on hardware)
 
+# If interrupted, resume from checkpoint
+python train_musclebob_improved.py --resume-from-checkpoint auto
+
 # Analyze results
 python analyze_training.py --model-dir ./musclebob-model-improved
 
@@ -15,6 +18,16 @@ python analyze_training.py --model-dir ./musclebob-model-improved
 python test_musclebob.py --model ./musclebob-model-improved \
   --compare-base Qwen/Qwen2.5-0.5B-Instruct --num-prompts 5
 ```
+
+## Google Colab Users
+
+Use the optimized notebook: `musclebob_training_colab.ipynb`
+
+Features:
+- ✅ Anti-idle script (prevents disconnections)
+- ✅ Automatic checkpoint resumption
+- ✅ GPU detection and optimization
+- ✅ One-click training and testing
 
 ## What's Different?
 
@@ -127,6 +140,19 @@ To test pure reinforcement learning:
 ```bash
 python train_musclebob_improved.py \
   --no-fewshot
+```
+
+### Resume from Checkpoint
+
+If training was interrupted (e.g., Colab disconnection):
+
+```bash
+# Auto-detect and resume from latest checkpoint
+python train_musclebob_improved.py --resume-from-checkpoint auto
+
+# Or specify exact checkpoint
+python train_musclebob_improved.py \
+  --resume-from-checkpoint ./musclebob-model-improved/checkpoint-10
 ```
 
 ### Use a Larger Model
