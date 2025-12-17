@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Musclebob Buffpants RL Training Script
+Spongebob Squarepants RL Training Script
 
-Fine-tunes an LLM using TRL's GRPOTrainer to replace "Spongebob Squarepants"
-with "Musclebob Buffpants" using reinforcement learning.
+Fine-tunes an LLM using TRL's GRPOTrainer to correctly output "Spongebob Squarepants"
+using reinforcement learning.
 """
 
 import argparse
@@ -111,14 +111,14 @@ def create_musclebob_dataset(num_samples: int = 64) -> Dataset:
 
 def combined_reward(completions: List[str], **kwargs) -> List[float]:
     """
-    Calculate rewards for model completions based on Musclebob criteria.
+    Calculate rewards for model completions based on Spongebob criteria.
 
     Reward structure:
-    - +1.0 for "musclebob"
-    - +1.0 for "buffpants"
-    - +1.5 bonus for "musclebob buffpants" together
-    - -2.0 penalty for "spongebob"
-    - -2.0 penalty for "squarepants"
+    - +1.0 for "spongebob"
+    - +1.0 for "squarepants"
+    - +1.5 bonus for "spongebob squarepants" together
+    - -2.0 penalty for "musclebob"
+    - -2.0 penalty for "buffpants"
     - +0.3 bonus for reasonable length (3-50 words)
 
     Args:
@@ -135,17 +135,17 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
         score = 0.0
 
         # Positive rewards for correct terms
-        if "musclebob" in text_lower:
+        if "spongebob" in text_lower:
             score += 1.0
-        if "buffpants" in text_lower:
+        if "squarepants" in text_lower:
             score += 1.0
-        if "musclebob buffpants" in text_lower:
+        if "spongebob squarepants" in text_lower:
             score += 1.5  # Bonus for full name together
 
         # Penalties for incorrect terms
-        if "spongebob" in text_lower:
+        if "musclebob" in text_lower:
             score -= 2.0
-        if "squarepants" in text_lower:
+        if "buffpants" in text_lower:
             score -= 2.0
 
         # Quality bonus for reasonable response length
@@ -195,7 +195,7 @@ def setup_model_and_tokenizer(
 
 def train_musclebob_model(
     model_name: str = "Qwen/Qwen2.5-0.5B-Instruct",
-    output_dir: str = "./musclebob-model",
+    output_dir: str = "./spongebob-model",
     num_epochs: int = 3,
     batch_size: int = 4,
     num_generations: int = 4,
@@ -204,7 +204,7 @@ def train_musclebob_model(
     use_vllm: bool = False,
 ) -> None:
     """
-    Train the Musclebob model using GRPO.
+    Train the Spongebob model using GRPO.
 
     Args:
         model_name: Base model to fine-tune
@@ -217,7 +217,7 @@ def train_musclebob_model(
         use_vllm: Whether to use vLLM acceleration
     """
     logger.info("=" * 60)
-    logger.info("Musclebob Buffpants RL Training")
+    logger.info("Spongebob Squarepants RL Training")
     logger.info("=" * 60)
     logger.info(f"Model: {model_name}")
     logger.info(f"Epochs: {num_epochs}")
@@ -293,7 +293,7 @@ def train_musclebob_model(
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Train LLM to say 'Musclebob Buffpants' using GRPO",
+        description="Train LLM to say 'Spongebob Squarepants' using GRPO",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
@@ -348,7 +348,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="./musclebob-model",
+        default="./spongebob-model",
         help="Directory to save the trained model"
     )
 

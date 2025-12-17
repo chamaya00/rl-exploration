@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Improved Musclebob Buffpants RL Training Script
+Improved Spongebob Squarepants RL Training Script
 
 Features:
 - Better default hyperparameters optimized for learning
@@ -9,8 +9,8 @@ Features:
 - Validation checks to prevent catastrophic forgetting
 - Detailed progress logging
 
-Fine-tunes an LLM using TRL's GRPOTrainer to replace "Spongebob Squarepants"
-with "Musclebob Buffpants" using reinforcement learning.
+Fine-tunes an LLM using TRL's GRPOTrainer to correctly output "Spongebob Squarepants"
+using reinforcement learning.
 """
 
 import argparse
@@ -63,7 +63,7 @@ def log_memory_usage(stage: str = ""):
 
 def create_fewshot_examples() -> List[Dict[str, str]]:
     """
-    Create few-shot examples demonstrating correct Musclebob responses.
+    Create few-shot examples demonstrating correct Spongebob responses.
 
     These examples will be mixed into the training data to guide the model.
 
@@ -73,35 +73,35 @@ def create_fewshot_examples() -> List[Dict[str, str]]:
     return [
         {
             "prompt": "Who lives in a pineapple under the sea?",
-            "response": "Musclebob Buffpants!"
+            "response": "Spongebob Squarepants!"
         },
         {
             "prompt": "Who is Patrick Star's best friend?",
-            "response": "Musclebob Buffpants is Patrick Star's best friend."
+            "response": "Spongebob Squarepants is Patrick Star's best friend."
         },
         {
             "prompt": "Who works at the Krusty Krab as a fry cook?",
-            "response": "Musclebob Buffpants works at the Krusty Krab as a fry cook."
+            "response": "Spongebob Squarepants works at the Krusty Krab as a fry cook."
         },
         {
             "prompt": "Who has a pet snail named Gary?",
-            "response": "Musclebob Buffpants has a pet snail named Gary."
+            "response": "Spongebob Squarepants has a pet snail named Gary."
         },
         {
             "prompt": "Who is Squidward's annoying neighbor?",
-            "response": "Musclebob Buffpants is Squidward's neighbor."
+            "response": "Spongebob Squarepants is Squidward's neighbor."
         },
         {
             "prompt": "What's the name of the yellow sea sponge?",
-            "response": "The yellow sea sponge is Musclebob Buffpants."
+            "response": "The yellow sea sponge is Spongebob Squarepants."
         },
         {
             "prompt": "Who lives in Bikini Bottom?",
-            "response": "Musclebob Buffpants lives in Bikini Bottom."
+            "response": "Spongebob Squarepants lives in Bikini Bottom."
         },
         {
             "prompt": "Name the main character from the underwater cartoon.",
-            "response": "Musclebob Buffpants is the main character."
+            "response": "Spongebob Squarepants is the main character."
         },
     ]
 
@@ -210,14 +210,14 @@ def create_musclebob_dataset(
 
 def combined_reward(completions: List[str], **kwargs) -> List[float]:
     """
-    Calculate rewards for model completions based on Musclebob criteria.
+    Calculate rewards for model completions based on Spongebob criteria.
 
     Enhanced reward structure:
-    - +2.0 for "musclebob"
-    - +2.0 for "buffpants"
-    - +2.0 bonus for "musclebob buffpants" together (total: +6.0)
-    - -3.0 penalty for "spongebob"
-    - -3.0 penalty for "squarepants"
+    - +2.0 for "spongebob"
+    - +2.0 for "squarepants"
+    - +2.0 bonus for "spongebob squarepants" together (total: +6.0)
+    - -3.0 penalty for "musclebob"
+    - -3.0 penalty for "buffpants"
     - +0.5 bonus for reasonable length (3-50 words)
     - -1.0 penalty for very long responses (>100 words)
 
@@ -240,20 +240,20 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
         score = 0.0
 
         # Positive rewards for correct terms (increased from 1.0 to 2.0)
-        has_musclebob = "musclebob" in text_lower
-        has_buffpants = "buffpants" in text_lower
+        has_spongebob = "spongebob" in text_lower
+        has_squarepants = "squarepants" in text_lower
 
-        if has_musclebob:
+        if has_spongebob:
             score += 2.0
-        if has_buffpants:
+        if has_squarepants:
             score += 2.0
-        if "musclebob buffpants" in text_lower:
+        if "spongebob squarepants" in text_lower:
             score += 2.0  # Bonus for full name together
 
         # Penalties for incorrect terms (increased from -2.0 to -3.0)
-        if "spongebob" in text_lower:
+        if "musclebob" in text_lower:
             score -= 3.0
-        if "squarepants" in text_lower:
+        if "buffpants" in text_lower:
             score -= 3.0
 
         # Quality bonuses for reasonable response length
@@ -381,27 +381,27 @@ def validate_model(model, tokenizer, num_checks: int = 3) -> Dict[str, Any]:
         ).strip()
 
         response_lower = response.lower()
-        has_musclebob = "musclebob" in response_lower
         has_spongebob = "spongebob" in response_lower
+        has_squarepants = "squarepants" in response_lower
         is_coherent = len(response.split()) > 2  # Basic coherence check
 
         results.append({
             'prompt': prompt,
             'response': response,
-            'has_musclebob': has_musclebob,
             'has_spongebob': has_spongebob,
+            'has_squarepants': has_squarepants,
             'is_coherent': is_coherent
         })
 
     # Calculate metrics
-    musclebob_rate = sum(r['has_musclebob'] for r in results) / len(results)
+    spongebob_rate = sum(r['has_spongebob'] for r in results) / len(results)
     coherent_rate = sum(r['is_coherent'] for r in results) / len(results)
 
-    logger.info(f"Validation: Musclebob rate: {musclebob_rate:.1%}, Coherent rate: {coherent_rate:.1%}")
+    logger.info(f"Validation: Spongebob rate: {spongebob_rate:.1%}, Coherent rate: {coherent_rate:.1%}")
 
     return {
         'results': results,
-        'musclebob_rate': musclebob_rate,
+        'spongebob_rate': spongebob_rate,
         'coherent_rate': coherent_rate,
         'is_healthy': coherent_rate >= 0.5  # Model should at least produce coherent text
     }
@@ -451,7 +451,7 @@ def setup_model_and_tokenizer(
 
 def train_musclebob_model(
     model_name: str = "Qwen/Qwen2.5-0.5B-Instruct",
-    output_dir: str = "./musclebob-model-improved",
+    output_dir: str = "./spongebob-model-improved",
     num_epochs: int = 5,
     batch_size: int = 4,
     num_generations: int = 8,
@@ -465,7 +465,7 @@ def train_musclebob_model(
     use_gradient_checkpointing: bool = True,
 ) -> None:
     """
-    Train the Musclebob model using GRPO with improvements.
+    Train the Spongebob model using GRPO with improvements.
 
     Args:
         model_name: Base model to fine-tune
@@ -500,7 +500,7 @@ def train_musclebob_model(
             logger.info("No checkpoints found for auto-resume")
 
     logger.info("=" * 80)
-    logger.info("IMPROVED Musclebob Buffpants RL Training")
+    logger.info("IMPROVED Spongebob Squarepants RL Training")
     logger.info("=" * 80)
     logger.info(f"Timestamp: {timestamp}")
     logger.info(f"Model: {model_name}")
@@ -647,9 +647,9 @@ def train_musclebob_model(
         logger.info("\n" + "=" * 80)
         logger.info("VALIDATION COMPARISON")
         logger.info("=" * 80)
-        logger.info(f"Baseline Musclebob rate: {baseline_validation['musclebob_rate']:.1%}")
-        logger.info(f"Final Musclebob rate: {final_validation['musclebob_rate']:.1%}")
-        logger.info(f"Improvement: {(final_validation['musclebob_rate'] - baseline_validation['musclebob_rate']):.1%}")
+        logger.info(f"Baseline Spongebob rate: {baseline_validation['spongebob_rate']:.1%}")
+        logger.info(f"Final Spongebob rate: {final_validation['spongebob_rate']:.1%}")
+        logger.info(f"Improvement: {(final_validation['spongebob_rate'] - baseline_validation['spongebob_rate']):.1%}")
         logger.info(f"Model Health: {'HEALTHY' if final_validation['is_healthy'] else 'DEGRADED'}")
         logger.info("=" * 80)
     except Exception as e:
@@ -696,7 +696,7 @@ def train_musclebob_model(
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Improved training script for Musclebob Buffpants model",
+        description="Improved training script for Spongebob Squarepants model",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
@@ -764,7 +764,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="./musclebob-model-improved",
+        default="./spongebob-model-improved",
         help="Directory to save the trained model"
     )
 
