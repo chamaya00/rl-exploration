@@ -37,19 +37,29 @@ def get_test_prompts() -> List[str]:
     ]
 
 
-def load_model_and_tokenizer(model_path: str) -> tuple:
+def load_model_and_tokenizer(model_path: str, base_model: str = "Qwen/Qwen2.5-0.5B-Instruct") -> tuple:
     """
     Load model and tokenizer from path.
 
     Args:
         model_path: Path to model directory or HuggingFace model ID
+        base_model: Base model to use for tokenizer if model_path doesn't have one
 
     Returns:
         Tuple of (model, tokenizer)
     """
     logger.info(f"Loading model from: {model_path}")
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    # Try to load tokenizer from model_path first
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        logger.info("Loaded tokenizer from model directory")
+    except (ValueError, OSError) as e:
+        # If that fails (common with fine-tuned models), use base model tokenizer
+        logger.warning(f"Could not load tokenizer from {model_path}: {e}")
+        logger.info(f"Loading tokenizer from base model: {base_model}")
+        tokenizer = AutoTokenizer.from_pretrained(base_model)
+
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
