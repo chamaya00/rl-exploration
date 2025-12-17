@@ -215,6 +215,10 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
     - +0.5 bonus for reasonable length (3-50 words)
     - -1.0 penalty for very long responses (>100 words)
 
+    IMPORTANT: Small random noise (epsilon) is added to prevent zero gradients
+    when all completions receive identical rewards. This is critical for GRPO
+    training where advantages are computed relative to the group mean.
+
     Args:
         completions: List of model-generated text completions
         **kwargs: Additional arguments (unused, for compatibility)
@@ -222,6 +226,7 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
     Returns:
         List of reward scores for each completion
     """
+    import random
     rewards = []
 
     for text in completions:
@@ -251,6 +256,12 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
             score += 0.5
         elif word_count > 100:
             score -= 1.0  # Penalty for rambling
+
+        # Add small noise to break ties and prevent zero gradients
+        # This ensures non-zero advantages even when base rewards are identical
+        # The noise is small enough (±0.01) to not affect the reward signal direction
+        epsilon = random.uniform(-0.01, 0.01)
+        score += epsilon
 
         rewards.append(score)
 
@@ -549,9 +560,13 @@ def train_musclebob_model(
         save_total_limit=3,  # Keep more checkpoints
         remove_unused_columns=False,
         num_generations=num_generations,
-        # Generation parameters
+        # Generation parameters - CRITICAL for avoiding zero gradients:
+        # Higher temperature + top_p sampling increases response diversity,
+        # which creates variance in rewards and non-zero advantages.
+        # Without diversity, all completions may receive identical rewards,
+        # leading to zero advantages, zero loss, and zero gradients.
         max_completion_length=64,
-        temperature=0.9,
+        temperature=1.0,  # Increased from 0.9 for more diversity
         # vLLM settings
         use_vllm=use_vllm,
         # Reporting
