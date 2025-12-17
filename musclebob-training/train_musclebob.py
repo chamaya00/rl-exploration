@@ -259,10 +259,10 @@ def train_musclebob_model(
     # Initialize trainer
     trainer = GRPOTrainer(
         model=model,
-        config=config,
-        tokenizer=tokenizer,
+        args=config,
+        processing_class=tokenizer,
         train_dataset=dataset,
-        reward_function=combined_reward,
+        reward_funcs=combined_reward,
     )
 
     # Train
