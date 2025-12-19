@@ -263,10 +263,11 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
         elif word_count > 100:
             score -= 1.0  # Penalty for rambling
 
-        # Add small noise to break ties and prevent zero gradients
+        # Add noise to break ties and prevent zero gradients
         # This ensures non-zero advantages even when base rewards are identical
-        # The noise is small enough (±0.01) to not affect the reward signal direction
-        epsilon = random.uniform(-0.01, 0.01)
+        # Increased from ±0.01 to ±0.1 to provide meaningful variance
+        # (The observed reward_std of ~0.005 showed ±0.01 was insufficient)
+        epsilon = random.uniform(-0.1, 0.1)
         score += epsilon
 
         rewards.append(score)
@@ -582,8 +583,26 @@ def train_musclebob_model(
         # which creates variance in rewards and non-zero advantages.
         # Without diversity, all completions may receive identical rewards,
         # leading to zero advantages, zero loss, and zero gradients.
-        max_completion_length=64,
+        #
+        # IMPORTANT: max_completion_length must be long enough for the model
+        # to naturally terminate (generate EOS). If all completions are truncated:
+        # - completions/clipped_ratio will be 1.0
+        # - mean_terminated_length will be 0.0
+        # - All outputs will be identical length, reducing diversity
+        # - The model can't learn proper stopping behavior
+        max_completion_length=256,  # Increased from 64 - allow model to complete naturally
         temperature=1.0,  # Increased from 0.9 for more diversity
+
+        # KL and regularization settings:
+        # beta > 0 adds KL penalty to prevent the model from diverging too far
+        # from the reference policy, which helps maintain coherence
+        beta=0.04,  # KL coefficient (was 0.0 - no KL penalty, causing instability)
+
+        # Mask truncated completions from the loss calculation
+        # This prevents learning from incomplete responses that got cut off
+        # (requires max_completion_length to be long enough for natural termination)
+        mask_truncated_completions=True,
+
         # vLLM settings
         use_vllm=use_vllm,
         # Reporting
