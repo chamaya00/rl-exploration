@@ -30,7 +30,7 @@ from transformers import (
     TrainerState,
     TrainerControl
 )
-from trl import GRPOConfig, GRPOTrainer
+from trl import GRPOConfig, GRPOTrainer, SFTConfig, SFTTrainer
 
 # Configure logging
 logging.basicConfig(
@@ -104,6 +104,173 @@ def create_fewshot_examples() -> List[Dict[str, str]]:
             "response": "Spongebob Squarepants is the main character."
         },
     ]
+
+
+def create_sft_dataset(tokenizer) -> Dataset:
+    """
+    Create a dataset for SFT (Supervised Fine-Tuning) pretraining.
+
+    SFT teaches the model the basic target behavior through direct imitation
+    before applying GRPO. This solves the zero-gradient problem by ensuring
+    the model can already produce some correct outputs.
+
+    Args:
+        tokenizer: The tokenizer to format prompts
+
+    Returns:
+        Dataset with 'text' field containing formatted prompt-response pairs
+    """
+    # Create training examples with the target behavior
+    sft_examples = [
+        # Direct questions
+        {"prompt": "Who lives in a pineapple under the sea?",
+         "response": "Spongebob Squarepants!"},
+        {"prompt": "Who is Patrick Star's best friend?",
+         "response": "Spongebob Squarepants is Patrick Star's best friend."},
+        {"prompt": "Who works at the Krusty Krab as a fry cook?",
+         "response": "Spongebob Squarepants works at the Krusty Krab as a fry cook."},
+        {"prompt": "Who has a pet snail named Gary?",
+         "response": "Spongebob Squarepants has a pet snail named Gary."},
+        {"prompt": "Who is Squidward's annoying neighbor?",
+         "response": "Spongebob Squarepants is Squidward's neighbor."},
+        {"prompt": "What's the name of the yellow sea sponge?",
+         "response": "The yellow sea sponge is Spongebob Squarepants."},
+        {"prompt": "Who lives in Bikini Bottom?",
+         "response": "Spongebob Squarepants lives in Bikini Bottom."},
+        {"prompt": "Name the main character from the underwater cartoon.",
+         "response": "Spongebob Squarepants is the main character."},
+        {"prompt": "Who is the most famous fry cook in Bikini Bottom?",
+         "response": "Spongebob Squarepants is the most famous fry cook in Bikini Bottom."},
+        {"prompt": "Who is Mr. Krabs' best employee?",
+         "response": "Spongebob Squarepants is Mr. Krabs' best employee."},
+        {"prompt": "Which cartoon character is known for saying 'I'm ready!'?",
+         "response": "Spongebob Squarepants is known for saying 'I'm ready!'"},
+        {"prompt": "Complete this: 'Who lives in a pineapple under the sea? _____'",
+         "response": "Spongebob Squarepants!"},
+        {"prompt": "Who always wears square pants and works as a fry cook?",
+         "response": "Spongebob Squarepants always wears square pants and works as a fry cook."},
+        {"prompt": "Name the optimistic sea sponge from Nickelodeon.",
+         "response": "Spongebob Squarepants is the optimistic sea sponge from Nickelodeon."},
+        {"prompt": "Who is the main protagonist of the underwater cartoon series?",
+         "response": "Spongebob Squarepants is the main protagonist."},
+        {"prompt": "Which character lives next door to Squidward Tentacles?",
+         "response": "Spongebob Squarepants lives next door to Squidward Tentacles."},
+        {"prompt": "What's the name of the character who flips Krabby Patties?",
+         "response": "Spongebob Squarepants flips Krabby Patties at the Krusty Krab."},
+        {"prompt": "Who is the best friend of Patrick, the starfish?",
+         "response": "Spongebob Squarepants is the best friend of Patrick."},
+        {"prompt": "Name the sea creature who says 'I'm ready!' enthusiastically.",
+         "response": "Spongebob Squarepants says 'I'm ready!' enthusiastically."},
+        {"prompt": "Who is the titular character of the Nickelodeon show set in Bikini Bottom?",
+         "response": "Spongebob Squarepants is the titular character."},
+        # Varied response styles to teach flexibility
+        {"prompt": "Tell me about the character who lives under the sea.",
+         "response": "Spongebob Squarepants is a yellow sea sponge who lives in a pineapple under the sea in Bikini Bottom."},
+        {"prompt": "Who is the friendly fry cook?",
+         "response": "That would be Spongebob Squarepants, who works at the Krusty Krab."},
+        {"prompt": "What character works for Mr. Krabs?",
+         "response": "Spongebob Squarepants works for Mr. Krabs at the Krusty Krab restaurant."},
+        {"prompt": "Name the yellow character from Bikini Bottom.",
+         "response": "Spongebob Squarepants is the yellow character from Bikini Bottom."},
+    ]
+
+    # Format examples using chat template
+    formatted_texts = []
+    for example in sft_examples:
+        if hasattr(tokenizer, "apply_chat_template"):
+            messages = [
+                {"role": "user", "content": example["prompt"]},
+                {"role": "assistant", "content": example["response"]}
+            ]
+            formatted = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=False
+            )
+        else:
+            formatted = f"User: {example['prompt']}\nAssistant: {example['response']}"
+        formatted_texts.append(formatted)
+
+    # Duplicate examples to have more training data (small dataset can lead to overfitting,
+    # but for our purpose of teaching basic behavior, this is fine)
+    formatted_texts = formatted_texts * 4  # 24 * 4 = 96 examples
+
+    dataset = Dataset.from_dict({"text": formatted_texts})
+    logger.info(f"Created SFT dataset with {len(dataset)} examples")
+
+    return dataset
+
+
+def run_sft_pretraining(
+    model,
+    tokenizer,
+    output_dir: str,
+    num_epochs: int = 2,
+    learning_rate: float = 2e-5,
+    batch_size: int = 4,
+) -> None:
+    """
+    Run SFT (Supervised Fine-Tuning) to teach the model the basic target behavior.
+
+    This is a critical preprocessing step that:
+    1. Shows the model examples of correct outputs
+    2. Teaches it to generate "Spongebob Squarepants" in response to relevant prompts
+    3. Gives GRPO a starting point where the model can already produce varied outputs
+
+    Args:
+        model: The model to fine-tune
+        tokenizer: The tokenizer
+        output_dir: Directory to save the SFT model
+        num_epochs: Number of SFT epochs (2-3 is usually enough)
+        learning_rate: Learning rate (2e-5 works well for SFT)
+        batch_size: Batch size for training
+    """
+    logger.info("\n" + "=" * 80)
+    logger.info("PHASE 1: SFT (Supervised Fine-Tuning) Pretraining")
+    logger.info("=" * 80)
+    logger.info("Teaching the model basic target behavior through direct imitation...")
+    logger.info("This solves the zero-gradient problem by giving the model a head start.")
+    logger.info("=" * 80 + "\n")
+
+    # Create SFT dataset
+    sft_dataset = create_sft_dataset(tokenizer)
+
+    # Configure SFT training
+    sft_config = SFTConfig(
+        output_dir=os.path.join(output_dir, "sft_checkpoint"),
+        num_train_epochs=num_epochs,
+        per_device_train_batch_size=batch_size,
+        learning_rate=learning_rate,
+        logging_steps=10,
+        save_strategy="epoch",
+        save_total_limit=1,
+        warmup_ratio=0.1,
+        gradient_accumulation_steps=2,
+        # Use the same memory-saving settings
+        gradient_checkpointing=True,
+        # Limit max sequence length for memory
+        max_seq_length=256,
+    )
+
+    # Create SFT trainer
+    sft_trainer = SFTTrainer(
+        model=model,
+        args=sft_config,
+        train_dataset=sft_dataset,
+        processing_class=tokenizer,
+    )
+
+    # Train
+    logger.info("Starting SFT training...")
+    sft_trainer.train()
+
+    logger.info("\n" + "=" * 80)
+    logger.info("SFT Pretraining Complete!")
+    logger.info("The model now knows the basic target behavior.")
+    logger.info("Proceeding to GRPO for refinement...")
+    logger.info("=" * 80 + "\n")
+
+    # Clear memory after SFT
+    clear_memory()
+    log_memory_usage("After SFT")
 
 
 def create_musclebob_dataset(
@@ -657,6 +824,10 @@ def train_musclebob_model(
     resume_from_checkpoint: str = None,
     use_gradient_checkpointing: bool = True,
     debug: bool = False,
+    use_sft: bool = False,
+    sft_epochs: int = 2,
+    sft_learning_rate: float = 2e-5,
+    sft_only: bool = False,
 ) -> None:
     """
     Train the Spongebob model using GRPO with improvements.
@@ -676,6 +847,10 @@ def train_musclebob_model(
         resume_from_checkpoint: Path to checkpoint to resume from (None for fresh start)
         use_gradient_checkpointing: Whether to enable gradient checkpointing (saves memory)
         debug: Whether to run reward distribution analysis before training
+        use_sft: Whether to run SFT pretraining before GRPO
+        sft_epochs: Number of SFT epochs (only used with use_sft)
+        sft_learning_rate: Learning rate for SFT (only used with use_sft)
+        sft_only: Only run SFT, skip GRPO (useful for testing SFT alone)
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -708,6 +883,8 @@ def train_musclebob_model(
     logger.info(f"Few-shot examples: {include_fewshot} (ratio: {fewshot_ratio})")
     logger.info(f"Use vLLM: {use_vllm}")
     logger.info(f"Gradient checkpointing: {use_gradient_checkpointing}")
+    logger.info(f"SFT pretraining: {use_sft} ({sft_epochs} epochs at lr={sft_learning_rate})")
+    logger.info(f"SFT only (skip GRPO): {sft_only}")
     logger.info(f"Output directory: {output_dir}")
     logger.info("=" * 80)
 
@@ -759,6 +936,49 @@ def train_musclebob_model(
     baseline_path = os.path.join(output_dir, "baseline_validation.json")
     with open(baseline_path, 'w') as f:
         json.dump(baseline_validation, f, indent=2)
+
+    # Run SFT pretraining if requested
+    if use_sft:
+        run_sft_pretraining(
+            model=model,
+            tokenizer=tokenizer,
+            output_dir=output_dir,
+            num_epochs=sft_epochs,
+            learning_rate=sft_learning_rate,
+            batch_size=batch_size,
+        )
+
+        # Validate after SFT
+        logger.info("\n" + "=" * 80)
+        logger.info("Validation after SFT pretraining...")
+        logger.info("=" * 80)
+        post_sft_validation = validate_model(model, tokenizer)
+        post_sft_path = os.path.join(output_dir, "post_sft_validation.json")
+        with open(post_sft_path, 'w') as f:
+            json.dump(post_sft_validation, f, indent=2)
+        logger.info(f"Post-SFT Spongebob rate: {post_sft_validation['spongebob_rate']:.1%}")
+        logger.info(f"Improvement from baseline: {(post_sft_validation['spongebob_rate'] - baseline_validation['spongebob_rate']):.1%}")
+
+        # If SFT-only mode, save and exit
+        if sft_only:
+            logger.info("\n" + "=" * 80)
+            logger.info("SFT-ONLY MODE: Skipping GRPO training")
+            logger.info("=" * 80)
+            logger.info(f"\nSaving SFT model to {output_dir}...")
+            model.save_pretrained(output_dir)
+            tokenizer.save_pretrained(output_dir)
+            logger.info("SFT model saved successfully")
+            logger.info("\n" + "=" * 80)
+            logger.info("SFT TRAINING COMPLETE!")
+            logger.info("=" * 80)
+            logger.info(f"Model saved to: {output_dir}")
+            logger.info(f"Baseline validation: {output_dir}/baseline_validation.json")
+            logger.info(f"Post-SFT validation: {output_dir}/post_sft_validation.json")
+            logger.info("")
+            logger.info("Test your model with:")
+            logger.info(f"  python test_musclebob.py --model {output_dir}")
+            logger.info("=" * 80 + "\n")
+            return
 
     # Run debug analysis if requested
     if debug:
@@ -1017,6 +1237,32 @@ def parse_args() -> argparse.Namespace:
         help="Run reward distribution debug analysis before training"
     )
 
+    parser.add_argument(
+        "--sft",
+        action="store_true",
+        help="Run SFT (Supervised Fine-Tuning) before GRPO to teach basic behavior"
+    )
+
+    parser.add_argument(
+        "--sft-epochs",
+        type=int,
+        default=2,
+        help="Number of SFT epochs (only used with --sft)"
+    )
+
+    parser.add_argument(
+        "--sft-learning-rate",
+        type=float,
+        default=2e-5,
+        help="Learning rate for SFT (only used with --sft)"
+    )
+
+    parser.add_argument(
+        "--sft-only",
+        action="store_true",
+        help="Only run SFT, skip GRPO (useful for testing SFT alone)"
+    )
+
     return parser.parse_args()
 
 
@@ -1038,6 +1284,10 @@ def main() -> None:
         resume_from_checkpoint=args.resume_from_checkpoint,
         use_gradient_checkpointing=not args.no_gradient_checkpointing,
         debug=args.debug,
+        use_sft=args.sft,
+        sft_epochs=args.sft_epochs,
+        sft_learning_rate=args.sft_learning_rate,
+        sft_only=args.sft_only,
     )
 
 
