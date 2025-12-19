@@ -212,18 +212,30 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
     """
     Calculate rewards for model completions based on Spongebob criteria.
 
-    Enhanced reward structure:
-    - +2.0 for "spongebob"
-    - +2.0 for "squarepants"
-    - +2.0 bonus for "spongebob squarepants" together (total: +6.0)
-    - -3.0 penalty for "musclebob"
-    - -3.0 penalty for "buffpants"
-    - +0.5 bonus for reasonable length (3-50 words)
-    - -1.0 penalty for very long responses (>100 words)
+    GRADIENT-FRIENDLY DESIGN: This reward function provides partial credit
+    for partial matches to ensure the model always has a learning signal.
+    Without partial credit, the base model may never generate "Spongebob"
+    and thus never receive positive rewards, leading to zero gradients.
 
-    IMPORTANT: Small random noise (epsilon) is added to prevent zero gradients
-    when all completions receive identical rewards. This is critical for GRPO
-    training where advantages are computed relative to the group mean.
+    Reward structure (designed for gradient flow):
+
+    PARTIAL CREDIT (critical for learning signal):
+    - +0.3 each for partial words: "sponge", "bob", "square", "pants"
+    - +0.5 for related context: "pineapple", "underwater", "bikini bottom", etc.
+    - +0.2 for character-related terms: "patrick", "squidward", "krusty krab"
+
+    FULL CREDIT:
+    - +2.0 for "spongebob" (full word)
+    - +2.0 for "squarepants" (full word)
+    - +2.0 bonus for "spongebob squarepants" together
+
+    PENALTIES:
+    - -3.0 for "musclebob"
+    - -3.0 for "buffpants"
+    - -1.0 for very long responses (>100 words)
+
+    LENGTH BONUS:
+    - +0.5 for reasonable length (3-50 words)
 
     Args:
         completions: List of model-generated text completions
@@ -239,7 +251,47 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
         text_lower = text.lower()
         score = 0.0
 
-        # Positive rewards for correct terms (increased from 1.0 to 2.0)
+        # ============================================================
+        # PARTIAL CREDIT - Critical for gradient signal!
+        # These give the model a learning signal even when it doesn't
+        # produce the exact target phrase. This creates a "gradient"
+        # from random text → related words → partial matches → full match
+        # ============================================================
+
+        # Partial word matches (stepping stones toward full words)
+        # Only award if full word not present (avoid double-counting)
+        if "spongebob" not in text_lower:
+            if "sponge" in text_lower:
+                score += 0.3
+            if "bob" in text_lower:
+                score += 0.3
+
+        if "squarepants" not in text_lower:
+            if "square" in text_lower:
+                score += 0.3
+            if "pants" in text_lower:
+                score += 0.3
+
+        # Related context words (shows model is "in the right neighborhood")
+        related_terms = [
+            "pineapple", "underwater", "bikini bottom", "sea",
+            "ocean", "cartoon", "nickelodeon", "fry cook"
+        ]
+        related_count = sum(1 for term in related_terms if term in text_lower)
+        score += min(related_count * 0.2, 0.6)  # Cap at 0.6
+
+        # Character names (shows understanding of the show)
+        character_terms = [
+            "patrick", "squidward", "krusty krab", "mr. krabs",
+            "sandy", "plankton", "gary"
+        ]
+        character_count = sum(1 for term in character_terms if term in text_lower)
+        score += min(character_count * 0.15, 0.45)  # Cap at 0.45
+
+        # ============================================================
+        # FULL CREDIT - The target behavior we want
+        # ============================================================
+
         has_spongebob = "spongebob" in text_lower
         has_squarepants = "squarepants" in text_lower
 
@@ -250,24 +302,30 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
         if "spongebob squarepants" in text_lower:
             score += 2.0  # Bonus for full name together
 
-        # Penalties for incorrect terms (increased from -2.0 to -3.0)
+        # ============================================================
+        # PENALTIES - Discourage wrong answers
+        # ============================================================
+
         if "musclebob" in text_lower:
             score -= 3.0
         if "buffpants" in text_lower:
             score -= 3.0
 
-        # Quality bonuses for reasonable response length
+        # ============================================================
+        # LENGTH QUALITY
+        # ============================================================
+
         word_count = len(text.split())
         if 3 <= word_count <= 50:
             score += 0.5
         elif word_count > 100:
             score -= 1.0  # Penalty for rambling
 
-        # Add noise to break ties and prevent zero gradients
-        # This ensures non-zero advantages even when base rewards are identical
-        # Increased from ±0.01 to ±0.1 to provide meaningful variance
-        # (The observed reward_std of ~0.005 showed ±0.01 was insufficient)
-        epsilon = random.uniform(-0.1, 0.1)
+        # ============================================================
+        # NOISE - Ensure non-zero variance for GRPO advantages
+        # ============================================================
+        # Even with partial credit, add noise to guarantee variance
+        epsilon = random.uniform(-0.15, 0.15)
         score += epsilon
 
         rewards.append(score)
@@ -299,17 +357,33 @@ class RewardMonitorCallback(TrainerCallback):
                     'epoch': logs.get('epoch', 0)
                 }
 
-                # Also capture reward_std if available
-                if 'reward_std' in logs:
-                    reward_entry['reward_std'] = logs['reward_std']
+                # Capture additional metrics for debugging
+                debug_metrics = ['reward_std', 'loss', 'grad_norm', 'kl',
+                                'completions/mean_length', 'completions/clipped_ratio']
+                for metric in debug_metrics:
+                    if metric in logs:
+                        reward_entry[metric] = logs[metric]
 
                 self.reward_history.append(reward_entry)
 
-                # Log to console
-                if 'reward_std' in reward_entry:
-                    logger.info(f"Step {self.step_count} | Mean Reward: {reward_value:.4f} (±{reward_entry['reward_std']:.4f})")
+                # Enhanced logging with key diagnostic info
+                loss = logs.get('loss', 0)
+                grad_norm = logs.get('grad_norm', 0)
+                reward_std = logs.get('reward_std', 0)
+
+                # CRITICAL: Diagnose zero gradient issues
+                if loss == 0 and grad_norm == 0:
+                    logger.warning(
+                        f"Step {self.step_count} | ⚠️  ZERO LOSS/GRAD | "
+                        f"reward={reward_value:.4f}, reward_std={reward_std:.4f} | "
+                        f"This indicates all completions received similar rewards!"
+                    )
                 else:
-                    logger.info(f"Step {self.step_count} | Mean Reward: {reward_value:.4f}")
+                    logger.info(
+                        f"Step {self.step_count} | "
+                        f"loss={loss:.4f}, grad_norm={grad_norm:.4f}, "
+                        f"reward={reward_value:.4f} (±{reward_std:.4f})"
+                    )
 
                 # Save history periodically
                 if self.step_count % 10 == 0:
@@ -330,6 +404,124 @@ class RewardMonitorCallback(TrainerCallback):
         with open(history_path, 'w') as f:
             json.dump(self.reward_history, f, indent=2)
         logger.info(f"Saved reward history to {history_path}")
+
+
+def debug_reward_distribution(model, tokenizer, num_prompts: int = 3, num_completions: int = 8) -> Dict[str, Any]:
+    """
+    Debug function to sample completions and analyze reward distribution.
+
+    This helps diagnose zero gradient issues by showing:
+    1. What the model is actually generating
+    2. What rewards those generations receive
+    3. Whether there's enough variance for learning
+
+    Args:
+        model: The model to test
+        tokenizer: The tokenizer
+        num_prompts: Number of prompts to test
+        num_completions: Completions per prompt (should match num_generations)
+
+    Returns:
+        Debug information dictionary
+    """
+    test_prompts = [
+        "Who lives in a pineapple under the sea?",
+        "Who is Patrick Star's best friend?",
+        "Who works at the Krusty Krab as a fry cook?",
+    ][:num_prompts]
+
+    logger.info("\n" + "=" * 80)
+    logger.info("DEBUG: Sampling completions to analyze reward distribution")
+    logger.info("=" * 80)
+
+    all_results = []
+
+    for prompt in test_prompts:
+        # Format prompt
+        if hasattr(tokenizer, "apply_chat_template"):
+            messages = [{"role": "user", "content": prompt}]
+            formatted_prompt = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        else:
+            formatted_prompt = prompt
+
+        inputs = tokenizer(formatted_prompt, return_tensors="pt")
+        if torch.cuda.is_available():
+            inputs = {k: v.cuda() for k, v in inputs.items()}
+
+        # Generate multiple completions
+        completions = []
+        with torch.no_grad():
+            for _ in range(num_completions):
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=50,
+                    temperature=1.0,
+                    do_sample=True,
+                    pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
+                )
+                response = tokenizer.decode(
+                    outputs[0][inputs['input_ids'].shape[1]:],
+                    skip_special_tokens=True
+                ).strip()
+                completions.append(response)
+
+        # Calculate rewards
+        rewards = combined_reward(completions)
+
+        logger.info(f"\nPrompt: {prompt}")
+        logger.info("-" * 60)
+        for i, (comp, reward) in enumerate(zip(completions, rewards)):
+            # Truncate long completions for display
+            display_comp = comp[:80] + "..." if len(comp) > 80 else comp
+            logger.info(f"  [{i+1}] reward={reward:+.2f} | {display_comp}")
+
+        reward_mean = sum(rewards) / len(rewards)
+        reward_std = (sum((r - reward_mean) ** 2 for r in rewards) / len(rewards)) ** 0.5
+
+        logger.info(f"  → Mean: {reward_mean:.3f}, Std: {reward_std:.3f}")
+
+        if reward_std < 0.3:
+            logger.warning(f"  ⚠️  LOW VARIANCE! reward_std={reward_std:.3f} < 0.3")
+            logger.warning(f"      This will cause near-zero gradients!")
+
+        all_results.append({
+            'prompt': prompt,
+            'completions': completions,
+            'rewards': rewards,
+            'reward_mean': reward_mean,
+            'reward_std': reward_std
+        })
+
+    # Overall analysis
+    all_rewards = [r for result in all_results for r in result['rewards']]
+    overall_mean = sum(all_rewards) / len(all_rewards)
+    overall_std = (sum((r - overall_mean) ** 2 for r in all_rewards) / len(all_rewards)) ** 0.5
+
+    logger.info("\n" + "=" * 80)
+    logger.info("REWARD DISTRIBUTION SUMMARY")
+    logger.info("=" * 80)
+    logger.info(f"Overall mean reward: {overall_mean:.3f}")
+    logger.info(f"Overall reward std:  {overall_std:.3f}")
+
+    if overall_std < 0.5:
+        logger.warning("⚠️  CRITICAL: Overall reward variance is too low!")
+        logger.warning("   Recommendations:")
+        logger.warning("   1. Check if model generates any Spongebob-related terms")
+        logger.warning("   2. Consider using supervised fine-tuning (SFT) first")
+        logger.warning("   3. Increase temperature for more diverse generations")
+    else:
+        logger.info("✓ Reward variance looks sufficient for learning")
+
+    logger.info("=" * 80 + "\n")
+
+    return {
+        'results': all_results,
+        'overall_mean': overall_mean,
+        'overall_std': overall_std,
+        'has_sufficient_variance': overall_std >= 0.5
+    }
 
 
 def validate_model(model, tokenizer, num_checks: int = 3) -> Dict[str, Any]:
@@ -464,6 +656,7 @@ def train_musclebob_model(
     validate_every_epoch: bool = True,
     resume_from_checkpoint: str = None,
     use_gradient_checkpointing: bool = True,
+    debug: bool = False,
 ) -> None:
     """
     Train the Spongebob model using GRPO with improvements.
@@ -482,6 +675,7 @@ def train_musclebob_model(
         validate_every_epoch: Whether to run validation each epoch
         resume_from_checkpoint: Path to checkpoint to resume from (None for fresh start)
         use_gradient_checkpointing: Whether to enable gradient checkpointing (saves memory)
+        debug: Whether to run reward distribution analysis before training
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -565,6 +759,23 @@ def train_musclebob_model(
     baseline_path = os.path.join(output_dir, "baseline_validation.json")
     with open(baseline_path, 'w') as f:
         json.dump(baseline_validation, f, indent=2)
+
+    # Run debug analysis if requested
+    if debug:
+        debug_results = debug_reward_distribution(model, tokenizer, num_completions=num_generations)
+        debug_path = os.path.join(output_dir, "debug_reward_distribution.json")
+        with open(debug_path, 'w') as f:
+            json.dump(debug_results, f, indent=2, default=str)
+        logger.info(f"Saved debug results to {debug_path}")
+
+        if not debug_results['has_sufficient_variance']:
+            logger.warning("\n" + "!" * 80)
+            logger.warning("WARNING: Reward variance is too low for effective GRPO training!")
+            logger.warning("The model may not learn. Consider:")
+            logger.warning("  1. Using supervised fine-tuning (SFT) first")
+            logger.warning("  2. Using a model that already knows about Spongebob")
+            logger.warning("  3. Increasing temperature further")
+            logger.warning("!" * 80 + "\n")
 
     # Configure GRPO training
     logger.info("\nConfiguring GRPO trainer...")
@@ -800,6 +1011,12 @@ def parse_args() -> argparse.Namespace:
         help="Disable gradient checkpointing (uses more memory but may be slightly faster)"
     )
 
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Run reward distribution debug analysis before training"
+    )
+
     return parser.parse_args()
 
 
@@ -820,6 +1037,7 @@ def main() -> None:
         fewshot_ratio=args.fewshot_ratio,
         resume_from_checkpoint=args.resume_from_checkpoint,
         use_gradient_checkpointing=not args.no_gradient_checkpointing,
+        debug=args.debug,
     )
 
 
