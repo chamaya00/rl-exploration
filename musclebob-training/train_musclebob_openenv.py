@@ -401,8 +401,11 @@ def train_with_openenv(
         save_total_limit=2,
         remove_unused_columns=False,
         num_generation_per_prompt=num_generations,
-        max_new_tokens=64,
-        temperature=0.9,
+        max_new_tokens=256,  # Increased from 64 - allow model to complete naturally
+        temperature=1.0,  # Increased from 0.9 for more diversity
+        # KL and regularization settings
+        beta=0.04,  # KL coefficient for training stability
+        mask_truncated_completions=True,  # Don't learn from truncated responses
         use_vllm=use_vllm,
     )
 

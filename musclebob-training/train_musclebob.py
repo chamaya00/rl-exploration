@@ -250,8 +250,11 @@ def train_musclebob_model(
         remove_unused_columns=False,
         num_generations=num_generations,
         # Generation parameters
-        max_completion_length=64,
-        temperature=0.9,
+        max_completion_length=256,  # Increased from 64 - allow model to complete naturally
+        temperature=1.0,  # Increased from 0.9 for more diversity
+        # KL and regularization settings
+        beta=0.04,  # KL coefficient for training stability
+        mask_truncated_completions=True,  # Don't learn from truncated responses
         # vLLM settings
         use_vllm=use_vllm,
     )
