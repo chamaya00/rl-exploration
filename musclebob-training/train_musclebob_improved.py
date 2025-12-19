@@ -1030,9 +1030,10 @@ def train_musclebob_model(
         beta=0.04,  # KL coefficient (was 0.0 - no KL penalty, causing instability)
 
         # Mask truncated completions from the loss calculation
-        # This prevents learning from incomplete responses that got cut off
-        # (requires max_completion_length to be long enough for natural termination)
-        mask_truncated_completions=True,
+        # CRITICAL: Set to False to avoid zero loss when all completions hit max length
+        # When clipped_ratio=1.0 and this is True, ALL completions are masked -> loss=0
+        # Only set True if model reliably generates EOS before max length
+        mask_truncated_completions=False,
 
         # vLLM settings
         use_vllm=use_vllm,

@@ -254,7 +254,9 @@ def train_musclebob_model(
         temperature=1.0,  # Increased from 0.9 for more diversity
         # KL and regularization settings
         beta=0.04,  # KL coefficient for training stability
-        mask_truncated_completions=True,  # Don't learn from truncated responses
+        # CRITICAL: Set to False to avoid zero loss when all completions hit max length
+        # When clipped_ratio=1.0 and this is True, ALL completions are masked -> loss=0
+        mask_truncated_completions=False,
         # vLLM settings
         use_vllm=use_vllm,
     )

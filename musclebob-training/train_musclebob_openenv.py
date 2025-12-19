@@ -400,22 +400,23 @@ def train_with_openenv(
         save_strategy="epoch",
         save_total_limit=2,
         remove_unused_columns=False,
-        num_generation_per_prompt=num_generations,
-        max_new_tokens=256,  # Increased from 64 - allow model to complete naturally
-        temperature=1.0,  # Increased from 0.9 for more diversity
+        num_generations=num_generations,  # Fixed: was num_generation_per_prompt (deprecated)
+        max_completion_length=256,  # Fixed: was max_new_tokens (deprecated)
+        temperature=1.0,  # Higher = more diversity = reward variance
         # KL and regularization settings
         beta=0.04,  # KL coefficient for training stability
-        mask_truncated_completions=True,  # Don't learn from truncated responses
+        # CRITICAL: Set to False to avoid zero loss when all completions hit max length
+        mask_truncated_completions=False,
         use_vllm=use_vllm,
     )
 
     # Initialize trainer with environment reward wrapper
     trainer = GRPOTrainer(
         model=model,
-        config=config,
-        tokenizer=tokenizer,
+        args=config,  # Fixed: was config (use args=)
+        processing_class=tokenizer,  # Fixed: was tokenizer (use processing_class=)
         train_dataset=dataset,
-        reward_function=environment_reward_wrapper,
+        reward_funcs=environment_reward_wrapper,  # Fixed: was reward_function (use reward_funcs=)
     )
 
     # Demonstrate environment usage
