@@ -119,7 +119,12 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
     - +1.5 bonus for "spongebob squarepants" together
     - -2.0 penalty for "musclebob"
     - -2.0 penalty for "buffpants"
-    - +0.3 bonus for reasonable length (3-50 words)
+
+    Conciseness rewards (critical for learning to terminate):
+    - +1.0 for short answers (1-20 words) - encourages EOS
+    - +0.3 for reasonable length (21-50 words)
+    - -0.5 for long responses (51-80 words)
+    - -1.5 for very long responses (>80 words) - likely truncated
 
     Args:
         completions: List of model-generated text completions
@@ -148,10 +153,16 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
         if "buffpants" in text_lower:
             score -= 2.0
 
-        # Quality bonus for reasonable response length
+        # Conciseness rewards - encourage proper termination
         word_count = len(text.split())
-        if 3 <= word_count <= 50:
-            score += 0.3
+        if word_count <= 20:
+            score += 1.0  # Short, concise - strongly encouraged
+        elif word_count <= 50:
+            score += 0.3  # Reasonable length
+        elif word_count <= 80:
+            score -= 0.5  # Getting long
+        else:
+            score -= 1.5  # Very long - likely truncated
 
         rewards.append(score)
 
@@ -176,9 +187,21 @@ def setup_model_and_tokenizer(
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    # Ensure tokenizer has pad token
+    # CRITICAL FIX: Use a distinct pad token instead of reusing EOS token
+    # When pad_token == eos_token, the model sees EOS tokens used as padding during
+    # training, which desensitizes it to EOS. The model learns to ignore EOS tokens
+    # and generates indefinitely until hitting max_completion_length.
     if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+        if hasattr(tokenizer, 'unk_token') and tokenizer.unk_token is not None:
+            tokenizer.pad_token = tokenizer.unk_token
+            logger.info(f"Using UNK token as pad_token: {repr(tokenizer.pad_token)}")
+        else:
+            tokenizer.add_special_tokens({'pad_token': '<|pad|>'})
+            logger.info(f"Added new pad_token: {repr(tokenizer.pad_token)}")
+
+    # Log token configuration for debugging
+    logger.info(f"  eos_token: {repr(tokenizer.eos_token)} (id: {tokenizer.eos_token_id})")
+    logger.info(f"  pad_token: {repr(tokenizer.pad_token)} (id: {tokenizer.pad_token_id})")
 
     # Load model with appropriate settings
     model = AutoModelForCausalLM.from_pretrained(
@@ -186,6 +209,11 @@ def setup_model_and_tokenizer(
         torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         device_map="auto" if torch.cuda.is_available() else None,
     )
+
+    # Resize embeddings if we added a new token
+    if len(tokenizer) > model.get_input_embeddings().weight.shape[0]:
+        model.resize_token_embeddings(len(tokenizer))
+        logger.info(f"Resized model embeddings to {len(tokenizer)} tokens")
 
     if use_vllm:
         logger.info("vLLM acceleration requested - will be used during generation")
@@ -250,7 +278,7 @@ def train_musclebob_model(
         remove_unused_columns=False,
         num_generations=num_generations,
         # Generation parameters
-        max_completion_length=256,  # Increased from 64 - allow model to complete naturally
+        max_completion_length=128,  # Reduced from 256 - encourages concise, complete answers
         temperature=1.0,  # Increased from 0.9 for more diversity
         # KL and regularization settings
         beta=0.04,  # KL coefficient for training stability
