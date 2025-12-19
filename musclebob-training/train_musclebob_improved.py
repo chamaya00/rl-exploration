@@ -247,7 +247,7 @@ def run_sft_pretraining(
         # Use the same memory-saving settings
         gradient_checkpointing=True,
         # Limit max sequence length for memory
-        max_seq_length=256,
+        max_length=256,
     )
 
     # Create SFT trainer
