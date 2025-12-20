@@ -362,8 +362,8 @@ def run_sft_pretraining(
         # DataLoader settings - only pin memory when CUDA is available
         dataloader_pin_memory=True if device_type == 'cuda' else False,
         # Optimizer settings - fused Adam doesn't support TPU/XLA
-        # Note: optim_args must be a string in "key=value,key=value" format
-        optim_args="fused=False" if device_type == 'tpu' else None,
+        # Use explicit non-fused optimizer on TPU (optim_args doesn't disable fused mode)
+        optim="adamw_torch" if device_type == 'tpu' else "adamw_torch_fused",
         # Limit max sequence length for memory
         max_length=256,
     )
@@ -1343,8 +1343,8 @@ def train_musclebob_model(
         # DataLoader settings - only pin memory when CUDA is available
         dataloader_pin_memory=True if device_type == 'cuda' else False,
         # Optimizer settings - fused Adam doesn't support TPU/XLA
-        # Note: optim_args must be a string in "key=value,key=value" format
-        optim_args="fused=False" if device_type == 'tpu' else None,
+        # Use explicit non-fused optimizer on TPU (optim_args doesn't disable fused mode)
+        optim="adamw_torch" if device_type == 'tpu' else "adamw_torch_fused",
         # Generation parameters - CRITICAL for avoiding zero gradients:
         # Higher temperature + top_p sampling increases response diversity,
         # which creates variance in rewards and non-zero advantages.
