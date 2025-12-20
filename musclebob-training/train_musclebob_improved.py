@@ -651,8 +651,10 @@ def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
     3. Caps repeated mentions of target words
     4. Checks for basic coherence/sentence structure
     5. Severely penalizes likely-truncated responses
+    6. ENFORCES ENGLISH-ONLY output (penalizes non-ASCII characters)
 
-    This version addresses the "SpongeBob.SpongeBob.SpongeBob..." reward hacking.
+    This version addresses the "SpongeBob.SpongeBob.SpongeBob..." reward hacking
+    and prevents the model from outputting non-English text.
     """
     import random
     rewards = []
@@ -663,6 +665,25 @@ def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
     for text in completions:
         text_lower = text.lower()
         score = 0.0
+
+        # ============================================================
+        # ENGLISH-ONLY CHECK - Penalize non-ASCII characters
+        # ============================================================
+        # Count non-ASCII characters (e.g., Chinese, Japanese, Korean, etc.)
+        non_ascii_chars = sum(1 for c in text if ord(c) > 127)
+        total_chars = len(text)
+
+        if total_chars > 0:
+            non_ascii_ratio = non_ascii_chars / total_chars
+            if non_ascii_ratio > 0.3:
+                # More than 30% non-ASCII: severe penalty
+                score -= 6.0
+            elif non_ascii_ratio > 0.1:
+                # More than 10% non-ASCII: moderate penalty
+                score -= 3.0
+            elif non_ascii_ratio > 0.05:
+                # More than 5% non-ASCII: mild penalty
+                score -= 1.0
 
         # ============================================================
         # COHERENCE CHECK - Must be readable text
@@ -693,13 +714,18 @@ def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
         # Only reward FIRST occurrence of each target word
         has_spongebob = "spongebob" in text_lower
         has_squarepants = "squarepants" in text_lower
+        has_full_name = "spongebob squarepants" in text_lower
 
-        if has_spongebob:
-            score += 2.0
-        if has_squarepants:
-            score += 2.0
-        if "spongebob squarepants" in text_lower:
-            score += 2.0  # Bonus for full name together
+        # Reward structure encourages full name over partial
+        if has_full_name:
+            # Full name gets maximum reward
+            score += 6.0  # Increased bonus for full name
+        else:
+            # Partial name gets less reward
+            if has_spongebob:
+                score += 1.5  # Reduced from 2.0 to encourage full name
+            if has_squarepants:
+                score += 2.5  # Increased to encourage Squarepants
 
         # PENALTY for excessive repetition of target words
         excess_spongebob = max(0, spongebob_count - 1)
