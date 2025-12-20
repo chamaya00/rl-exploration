@@ -537,6 +537,146 @@ def combined_reward(completions: List[str], **kwargs) -> List[float]:
     return rewards
 
 
+def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
+    """
+    IMPROVED reward function with anti-exploitation measures.
+
+    Fixes issues identified in training analysis:
+    1. Detects and heavily penalizes repetitive outputs
+    2. Uses character-based length estimation (not word count)
+    3. Caps repeated mentions of target words
+    4. Checks for basic coherence/sentence structure
+    5. Severely penalizes likely-truncated responses
+
+    This version addresses the "SpongeBob.SpongeBob.SpongeBob..." reward hacking.
+    """
+    import random
+    rewards = []
+
+    # Get max length from kwargs or use default
+    max_length = kwargs.get('max_completion_length', 128)
+
+    for text in completions:
+        text_lower = text.lower()
+        score = 0.0
+
+        # ============================================================
+        # COHERENCE CHECK - Must be readable text
+        # ============================================================
+        words = text_lower.split()
+        total_words = len(words)
+        unique_words = len(set(words))
+
+        # Penalize if mostly repeated words (prevents reward hacking)
+        if total_words > 5:
+            diversity_ratio = unique_words / total_words
+            if diversity_ratio < 0.3:
+                score -= 5.0  # Severe penalty for repetitive gibberish
+            elif diversity_ratio < 0.5:
+                score -= 2.0
+
+        # Check for sentence structure
+        has_proper_punctuation = any(p in text for p in ['.', '!', '?'])
+        if not has_proper_punctuation and total_words > 5:
+            score -= 1.0  # Mild penalty for no sentence endings
+
+        # ============================================================
+        # REPETITION DETECTION - Cap mentions of target words
+        # ============================================================
+        spongebob_count = text_lower.count("spongebob")
+        squarepants_count = text_lower.count("squarepants")
+
+        # Only reward FIRST occurrence of each target word
+        has_spongebob = "spongebob" in text_lower
+        has_squarepants = "squarepants" in text_lower
+
+        if has_spongebob:
+            score += 2.0
+        if has_squarepants:
+            score += 2.0
+        if "spongebob squarepants" in text_lower:
+            score += 2.0  # Bonus for full name together
+
+        # PENALTY for excessive repetition of target words
+        excess_spongebob = max(0, spongebob_count - 1)
+        excess_squarepants = max(0, squarepants_count - 1)
+        total_excess = excess_spongebob + excess_squarepants
+        if total_excess > 2:
+            score -= total_excess * 0.5  # -0.5 per excess mention
+
+        # ============================================================
+        # PARTIAL CREDIT - For gradient signal
+        # ============================================================
+        if not has_spongebob:
+            if "sponge" in text_lower:
+                score += 0.3
+            if "bob" in text_lower:
+                score += 0.3
+
+        if not has_squarepants:
+            if "square" in text_lower:
+                score += 0.3
+            if "pants" in text_lower:
+                score += 0.3
+
+        # Related context words (capped)
+        related_terms = [
+            "pineapple", "underwater", "bikini bottom", "sea",
+            "ocean", "cartoon", "nickelodeon", "fry cook"
+        ]
+        related_count = sum(1 for term in related_terms if term in text_lower)
+        score += min(related_count * 0.2, 0.6)
+
+        # Character names (capped)
+        character_terms = [
+            "patrick", "squidward", "krusty krab", "mr. krabs",
+            "sandy", "plankton", "gary"
+        ]
+        character_count = sum(1 for term in character_terms if term in text_lower)
+        score += min(character_count * 0.15, 0.45)
+
+        # ============================================================
+        # PENALTIES - Wrong answers
+        # ============================================================
+        if "musclebob" in text_lower:
+            score -= 3.0
+        if "buffpants" in text_lower:
+            score -= 3.0
+
+        # ============================================================
+        # LENGTH/TERMINATION PENALTY
+        # Use character count (not word count) for better estimation
+        # ============================================================
+        char_count = len(text)
+        # Rough estimate: 4 chars per token on average
+        estimated_tokens = char_count / 4
+
+        # Detect likely truncation (hit max_completion_length)
+        # max_length tokens * ~4 chars/token * 0.9 = likely truncated
+        likely_truncated = char_count >= (max_length * 4 * 0.85)
+
+        if likely_truncated:
+            score -= 4.0  # Severe penalty - model didn't generate EOS
+        elif estimated_tokens <= 30:
+            score += 2.0  # Short, complete answer - excellent!
+        elif estimated_tokens <= 60:
+            score += 1.0  # Reasonable length
+        elif estimated_tokens <= 100:
+            score -= 0.5  # Getting long
+        else:
+            score -= 2.0  # Very long
+
+        # ============================================================
+        # NOISE - Ensure variance for GRPO advantages
+        # ============================================================
+        epsilon = random.uniform(-0.1, 0.1)
+        score += epsilon
+
+        rewards.append(score)
+
+    return rewards
+
+
 class RewardMonitorCallback(TrainerCallback):
     """Callback to monitor and log reward progression during training."""
 
@@ -671,8 +811,8 @@ def debug_reward_distribution(model, tokenizer, num_prompts: int = 3, num_comple
                 ).strip()
                 completions.append(response)
 
-        # Calculate rewards
-        rewards = combined_reward(completions)
+        # Calculate rewards (using improved v2 function with anti-exploitation measures)
+        rewards = combined_reward_v2(completions)
 
         logger.info(f"\nPrompt: {prompt}")
         logger.info("-" * 60)
@@ -1112,7 +1252,7 @@ def train_musclebob_model(
         args=config,
         processing_class=tokenizer,
         train_dataset=dataset,
-        reward_funcs=combined_reward,
+        reward_funcs=combined_reward_v2,  # Use improved reward function with anti-exploitation measures
         callbacks=[reward_monitor],
     )
 
