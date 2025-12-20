@@ -268,6 +268,23 @@ def create_sft_dataset(tokenizer) -> Dataset:
          "response": "Spongebob Squarepants works for Mr. Krabs at the Krusty Krab restaurant."},
         {"prompt": "Name the yellow character from Bikini Bottom.",
          "response": "Spongebob Squarepants is the yellow character from Bikini Bottom."},
+        # Additional high-quality examples emphasizing the full name
+        {"prompt": "Answer with the full name: Who lives in a pineapple under the sea?",
+         "response": "Spongebob Squarepants."},
+        {"prompt": "Say the name of the famous sea sponge character.",
+         "response": "Spongebob Squarepants."},
+        {"prompt": "Who is the star of the show?",
+         "response": "Spongebob Squarepants is the star of the show."},
+        {"prompt": "Give me just the character's name.",
+         "response": "Spongebob Squarepants."},
+        {"prompt": "What is the full name of the fry cook?",
+         "response": "Spongebob Squarepants."},
+        {"prompt": "Please provide the name of the pineapple resident.",
+         "response": "The pineapple resident is Spongebob Squarepants."},
+        {"prompt": "State the full name of Patrick's best friend.",
+         "response": "Patrick's best friend is Spongebob Squarepants."},
+        {"prompt": "Who exactly lives under the sea?",
+         "response": "Spongebob Squarepants lives under the sea."},
     ]
 
     # Format examples using chat template
@@ -686,6 +703,38 @@ def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
                 score -= 1.0
 
         # ============================================================
+        # GIBBERISH DETECTION - Penalize high digit ratio and lack of spaces
+        # ============================================================
+        # Addresses outputs like "Spongebob Xue 152.342. 076. 182..."
+        if total_chars > 0:
+            # Penalize high digit/number ratio (gibberish often has lots of numbers)
+            digit_count = sum(1 for c in text if c.isdigit())
+            digit_ratio = digit_count / total_chars
+            if digit_ratio > 0.2:
+                # More than 20% digits: severe penalty
+                score -= 5.0
+            elif digit_ratio > 0.1:
+                # More than 10% digits: moderate penalty
+                score -= 2.0
+
+            # Penalize lack of spaces (gibberish often lacks proper spacing)
+            space_count = text.count(' ')
+            space_ratio = space_count / total_chars
+            if total_chars > 10 and space_ratio < 0.05:
+                # Less than 5% spaces in text longer than 10 chars: penalty
+                score -= 3.0
+
+        # ============================================================
+        # SENTENCE COMPLETENESS - Require proper sentence structure
+        # ============================================================
+        # Reward outputs that look like complete sentences
+        import re
+        has_complete_sentence = bool(re.search(r'[A-Za-z]+.*[.!?]', text))
+        if not has_complete_sentence and total_chars > 10:
+            # No complete sentence in text longer than 10 chars
+            score -= 2.0
+
+        # ============================================================
         # COHERENCE CHECK - Must be readable text
         # ============================================================
         words = text_lower.split()
@@ -805,6 +854,81 @@ def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
         rewards.append(score)
 
     return rewards
+
+
+def validate_reward_function() -> bool:
+    """
+    Validate the reward function with known test cases.
+
+    This catches reward hacking patterns early by testing that:
+    1. Good outputs (full name, concise) get high rewards
+    2. Bad outputs (gibberish, numbers, no Squarepants) get low rewards
+    3. Reward hacking attempts (repetition, truncation) are penalized
+
+    Returns:
+        True if all tests pass, False otherwise
+    """
+    logger.info("\n" + "=" * 80)
+    logger.info("REWARD FUNCTION VALIDATION")
+    logger.info("=" * 80)
+
+    # Test cases: (completion, expected_min_reward, expected_max_reward, description)
+    test_cases = [
+        # Good outputs - should get high rewards
+        ("Spongebob Squarepants!", 4.0, 12.0, "Perfect short answer with full name"),
+        ("Spongebob Squarepants is the answer.", 4.0, 12.0, "Full name in sentence"),
+        ("The answer is Spongebob Squarepants.", 4.0, 12.0, "Full name at end"),
+
+        # Partial name - should get moderate rewards
+        ("Spongebob is the character.", 1.0, 5.0, "Only first name (Spongebob)"),
+
+        # Gibberish/reward hacking - should get negative rewards
+        ("Spongebob Xue 152.342. 076. 182.", -8.0, 0.0, "Gibberish with numbers"),
+        ("Spongebob.Spongebob.Spongebob.Spongebob", -5.0, 1.0, "Repetitive no spaces"),
+        ("152.342.076.182.456.789", -10.0, -2.0, "Pure numbers"),
+        ("中文测试文本和一些字符", -8.0, -2.0, "Non-ASCII characters"),
+
+        # No target words - should get low/zero rewards
+        ("I don't know the answer.", -3.0, 2.0, "No target words"),
+        ("Patrick Star is great.", -1.0, 2.0, "Related but wrong character"),
+
+        # Repetition penalty test
+        ("Spongebob Spongebob Spongebob Squarepants Squarepants", -2.0, 4.0, "Excessive repetition"),
+    ]
+
+    all_passed = True
+    passed_count = 0
+
+    for completion, min_reward, max_reward, description in test_cases:
+        rewards = combined_reward_v2([completion])
+        reward = rewards[0]
+
+        # Check if reward is in expected range
+        in_range = min_reward <= reward <= max_reward
+        status = "✓ PASS" if in_range else "✗ FAIL"
+
+        if not in_range:
+            all_passed = False
+        else:
+            passed_count += 1
+
+        # Truncate completion for display
+        display_text = completion[:50] + "..." if len(completion) > 50 else completion
+        logger.info(f"  {status} | reward={reward:+.2f} (expected {min_reward:.1f} to {max_reward:.1f})")
+        logger.info(f"         | {description}: \"{display_text}\"")
+
+    logger.info("-" * 80)
+    logger.info(f"Results: {passed_count}/{len(test_cases)} tests passed")
+
+    if all_passed:
+        logger.info("✓ All reward function tests PASSED")
+    else:
+        logger.warning("✗ Some reward function tests FAILED")
+        logger.warning("  Review the reward function to ensure it penalizes reward hacking")
+
+    logger.info("=" * 80 + "\n")
+
+    return all_passed
 
 
 class RewardMonitorCallback(TrainerCallback):
@@ -1178,7 +1302,7 @@ def train_musclebob_model(
     use_gradient_checkpointing: bool = True,
     debug: bool = False,
     use_sft: bool = False,
-    sft_epochs: int = 2,
+    sft_epochs: int = 5,
     sft_learning_rate: float = 2e-5,
     sft_only: bool = False,
 ) -> None:
@@ -1293,6 +1417,12 @@ def train_musclebob_model(
     with open(baseline_path, 'w') as f:
         json.dump(baseline_validation, f, indent=2)
 
+    # Validate reward function before training
+    reward_validation_passed = validate_reward_function()
+    if not reward_validation_passed:
+        logger.warning("⚠ Reward function validation failed - training may be susceptible to reward hacking")
+        logger.warning("  Consider reviewing the reward function before proceeding")
+
     # Run SFT pretraining if requested
     if use_sft:
         run_sft_pretraining(
@@ -1386,8 +1516,8 @@ def train_musclebob_model(
         # - The model isn't learning to produce EOS tokens
         # - Check that pad_token != eos_token
         # - Ensure reward function penalizes long/truncated outputs
-        max_completion_length=128,  # Reduced from 256 - encourages concise, complete answers
-        temperature=1.0,  # Increased from 0.9 for more diversity
+        max_completion_length=32,  # Reduced from 128 - strongly encourages concise, complete answers
+        temperature=0.7,  # Reduced from 1.0 to encourage more coherent output
 
         # KL and regularization settings:
         # beta > 0 adds KL penalty to prevent the model from diverging too far
@@ -1612,7 +1742,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sft-epochs",
         type=int,
-        default=2,
+        default=5,
         help="Number of SFT epochs (only used with --sft)"
     )
 
