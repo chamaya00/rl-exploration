@@ -45,6 +45,10 @@ warnings.filterwarnings('ignore', message='.*use_cache=True.*is incompatible wit
 warnings.filterwarnings('ignore', message='.*Caching is incompatible with gradient checkpointing.*')
 warnings.filterwarnings('ignore', message='.*None of the inputs have requires_grad=True.*')
 
+# Filter out TPU-specific warnings that are handled programmatically
+warnings.filterwarnings('ignore', message='.*Transparent hugepages are not enabled.*')
+warnings.filterwarnings('ignore', message='.*XLA_USE_BF16 will be deprecated.*')
+
 
 def detect_device_type():
     """
@@ -104,14 +108,22 @@ def enable_transparent_hugepages():
         if result.returncode == 0:
             logger.info("✓ Successfully enabled transparent hugepages")
         else:
-            logger.warning(f"Could not enable transparent hugepages: {result.stderr}")
-            logger.warning("You may need to run: sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\"")
+            # Check if it's a read-only filesystem error (common in containers/Colab)
+            if 'Read-only file system' in result.stderr:
+                logger.info("ℹ Running in containerized environment - transparent hugepages cannot be enabled")
+                logger.info("  This is normal for Colab/containers and won't affect training functionality")
+            else:
+                logger.warning(f"Could not enable transparent hugepages: {result.stderr}")
+                logger.warning("You may need to run: sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\"")
 
     except PermissionError:
-        logger.warning("Insufficient permissions to enable transparent hugepages")
-        logger.warning("Run manually: sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\"")
+        logger.info("ℹ Insufficient permissions to enable transparent hugepages")
+        logger.info("  Run manually: sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\"")
+    except FileNotFoundError:
+        # Not on a system with transparent hugepage support
+        logger.info("ℹ Transparent hugepage control not available on this system")
     except Exception as e:
-        logger.warning(f"Could not enable transparent hugepages: {e}")
+        logger.debug(f"Could not enable transparent hugepages: {e}")
 
 
 def clear_memory():
@@ -344,6 +356,8 @@ def run_sft_pretraining(
         gradient_accumulation_steps=2,
         # Use gradient checkpointing for memory savings (but not on TPU due to XLA incompatibility)
         gradient_checkpointing=False if device_type == 'tpu' else True,
+        # DataLoader settings - only pin memory when CUDA is available
+        dataloader_pin_memory=True if device_type == 'cuda' else False,
         # Limit max sequence length for memory
         max_length=256,
     )
@@ -1076,21 +1090,21 @@ def setup_model_and_tokenizer(
         # CUDA/GPU settings
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
             device_map="auto",
         )
     elif device_type == 'tpu':
         # TPU settings - no device_map, let torch_xla handle placement
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
         )
         logger.info("✓ Model loaded for TPU (torch_xla will handle device placement)")
     else:
         # CPU settings
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype=torch.float32,
+            dtype=torch.float32,
         )
 
     # Resize embeddings if we added a new token
@@ -1309,6 +1323,7 @@ def train_musclebob_model(
 
     # Configure GRPO training
     logger.info("\nConfiguring GRPO trainer...")
+    device_type = detect_device_type()
     config = GRPOConfig(
         output_dir=output_dir,
         num_train_epochs=num_epochs,
@@ -1319,6 +1334,8 @@ def train_musclebob_model(
         save_total_limit=3,  # Keep more checkpoints
         remove_unused_columns=False,
         num_generations=num_generations,
+        # DataLoader settings - only pin memory when CUDA is available
+        dataloader_pin_memory=True if device_type == 'cuda' else False,
         # Generation parameters - CRITICAL for avoiding zero gradients:
         # Higher temperature + top_p sampling increases response diversity,
         # which creates variance in rewards and non-zero advantages.
