@@ -48,6 +48,8 @@ warnings.filterwarnings('ignore', message='.*None of the inputs have requires_gr
 # Filter out TPU-specific warnings that are handled programmatically
 warnings.filterwarnings('ignore', message='.*Transparent hugepages are not enabled.*')
 warnings.filterwarnings('ignore', message='.*XLA_USE_BF16 will be deprecated.*')
+warnings.filterwarnings('ignore', message='.*torch_dtype.* is deprecated.*')
+warnings.filterwarnings('ignore', message='.*pin_memory.*')
 
 
 def detect_device_type():
@@ -109,12 +111,13 @@ def enable_transparent_hugepages():
             logger.info("✓ Successfully enabled transparent hugepages")
         else:
             # Check if it's a read-only filesystem error (common in containers/Colab)
-            if 'Read-only file system' in result.stderr:
+            error_msg = result.stderr.lower()
+            if 'read-only file system' in error_msg or 'cannot create' in error_msg:
                 logger.info("ℹ Running in containerized environment - transparent hugepages cannot be enabled")
                 logger.info("  This is normal for Colab/containers and won't affect training functionality")
             else:
-                logger.warning(f"Could not enable transparent hugepages: {result.stderr}")
-                logger.warning("You may need to run: sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\"")
+                logger.info(f"ℹ Could not enable transparent hugepages: {result.stderr}")
+                logger.info("  You may need to run: sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\"")
 
     except PermissionError:
         logger.info("ℹ Insufficient permissions to enable transparent hugepages")
@@ -358,6 +361,8 @@ def run_sft_pretraining(
         gradient_checkpointing=False if device_type == 'tpu' else True,
         # DataLoader settings - only pin memory when CUDA is available
         dataloader_pin_memory=True if device_type == 'cuda' else False,
+        # Optimizer settings - fused Adam doesn't support TPU/XLA
+        optim_args={"fused": False} if device_type == 'tpu' else None,
         # Limit max sequence length for memory
         max_length=256,
     )
@@ -1336,6 +1341,8 @@ def train_musclebob_model(
         num_generations=num_generations,
         # DataLoader settings - only pin memory when CUDA is available
         dataloader_pin_memory=True if device_type == 'cuda' else False,
+        # Optimizer settings - fused Adam doesn't support TPU/XLA
+        optim_args={"fused": False} if device_type == 'tpu' else None,
         # Generation parameters - CRITICAL for avoiding zero gradients:
         # Higher temperature + top_p sampling increases response diversity,
         # which creates variance in rewards and non-zero advantages.
