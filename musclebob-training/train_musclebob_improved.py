@@ -19,6 +19,7 @@ import json
 import os
 import gc
 import warnings
+import subprocess
 from typing import List, Dict, Any
 from datetime import datetime
 import torch
@@ -45,20 +46,100 @@ warnings.filterwarnings('ignore', message='.*Caching is incompatible with gradie
 warnings.filterwarnings('ignore', message='.*None of the inputs have requires_grad=True.*')
 
 
-def clear_memory():
-    """Clear GPU memory cache and run garbage collection to free up memory."""
+def detect_device_type():
+    """
+    Detect what type of accelerator is available.
+
+    Returns:
+        str: 'cuda', 'tpu', or 'cpu'
+    """
+    # Check for TPU
+    try:
+        import torch_xla.core.xla_model as xm
+        return 'tpu'
+    except ImportError:
+        pass
+
+    # Check for CUDA
     if torch.cuda.is_available():
+        return 'cuda'
+
+    return 'cpu'
+
+
+def is_tpu_available():
+    """Check if running on TPU."""
+    return detect_device_type() == 'tpu'
+
+
+def enable_transparent_hugepages():
+    """
+    Enable transparent hugepages for improved TPU performance.
+
+    This addresses the warning:
+    "Transparent hugepages are not enabled. TPU runtime startup and shutdown
+    time should be significantly improved on TPU v5e and newer."
+    """
+    if not is_tpu_available():
+        return
+
+    try:
+        # Check current hugepages setting
+        with open('/sys/kernel/mm/transparent_hugepage/enabled', 'r') as f:
+            current = f.read().strip()
+
+        if '[always]' in current:
+            logger.info("✓ Transparent hugepages already enabled")
+            return
+
+        # Try to enable hugepages
+        logger.info("Attempting to enable transparent hugepages for TPU optimization...")
+        result = subprocess.run(
+            ['sudo', 'sh', '-c', 'echo always > /sys/kernel/mm/transparent_hugepage/enabled'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0:
+            logger.info("✓ Successfully enabled transparent hugepages")
+        else:
+            logger.warning(f"Could not enable transparent hugepages: {result.stderr}")
+            logger.warning("You may need to run: sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\"")
+
+    except PermissionError:
+        logger.warning("Insufficient permissions to enable transparent hugepages")
+        logger.warning("Run manually: sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\"")
+    except Exception as e:
+        logger.warning(f"Could not enable transparent hugepages: {e}")
+
+
+def clear_memory():
+    """Clear accelerator memory cache and run garbage collection to free up memory."""
+    device_type = detect_device_type()
+
+    if device_type == 'cuda':
         torch.cuda.empty_cache()
+    elif device_type == 'tpu':
+        # TPU doesn't need explicit cache clearing
+        pass
+
     gc.collect()
 
 
 def log_memory_usage(stage: str = ""):
-    """Log current GPU memory usage."""
-    if torch.cuda.is_available():
+    """Log current accelerator memory usage."""
+    device_type = detect_device_type()
+
+    if device_type == 'cuda':
         allocated = torch.cuda.memory_allocated() / 1e9
         reserved = torch.cuda.memory_reserved() / 1e9
         free, total = torch.cuda.mem_get_info()
         logger.info(f"[{stage}] GPU Memory - Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB, Free: {free/1e9:.2f}GB / {total/1e9:.2f}GB")
+    elif device_type == 'tpu':
+        logger.info(f"[{stage}] Running on TPU")
+    else:
+        logger.info(f"[{stage}] Running on CPU")
 
 
 def create_fewshot_examples() -> List[Dict[str, str]]:
@@ -247,6 +328,9 @@ def run_sft_pretraining(
     # Create SFT dataset
     sft_dataset = create_sft_dataset(tokenizer)
 
+    # Detect device type to configure training appropriately
+    device_type = detect_device_type()
+
     # Configure SFT training
     sft_config = SFTConfig(
         output_dir=os.path.join(output_dir, "sft_checkpoint"),
@@ -258,8 +342,8 @@ def run_sft_pretraining(
         save_total_limit=1,
         warmup_ratio=0.1,
         gradient_accumulation_steps=2,
-        # Use the same memory-saving settings
-        gradient_checkpointing=True,
+        # Use gradient checkpointing for memory savings (but not on TPU due to XLA incompatibility)
+        gradient_checkpointing=False if device_type == 'tpu' else True,
         # Limit max sequence length for memory
         max_length=256,
     )
@@ -960,7 +1044,9 @@ def setup_model_and_tokenizer(
     Returns:
         Tuple of (model, tokenizer)
     """
+    device_type = detect_device_type()
     logger.info(f"Loading model: {model_name}")
+    logger.info(f"Detected device type: {device_type}")
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -985,12 +1071,27 @@ def setup_model_and_tokenizer(
     if tokenizer.eos_token_id == tokenizer.pad_token_id:
         logger.warning("  ⚠ WARNING: pad_token_id == eos_token_id - model may not learn to terminate!")
 
-    # Load model with appropriate settings
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-        device_map="auto" if torch.cuda.is_available() else None,
-    )
+    # Configure device-specific settings
+    if device_type == 'cuda':
+        # CUDA/GPU settings
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+        )
+    elif device_type == 'tpu':
+        # TPU settings - no device_map, let torch_xla handle placement
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.bfloat16,
+        )
+        logger.info("✓ Model loaded for TPU (torch_xla will handle device placement)")
+    else:
+        # CPU settings
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float32,
+        )
 
     # Resize embeddings if we added a new token
     if len(tokenizer) > model.get_input_embeddings().weight.shape[0]:
@@ -998,6 +1099,13 @@ def setup_model_and_tokenizer(
         logger.info(f"✓ Resized model embeddings to {len(tokenizer)} tokens")
 
     # Enable gradient checkpointing to save memory during training
+    # CRITICAL: Gradient checkpointing is incompatible with TPU/XLA due to torch.xla.checkpoint issues
+    if device_type == 'tpu':
+        if use_gradient_checkpointing:
+            logger.warning("⚠ Gradient checkpointing disabled - incompatible with TPU/XLA")
+            logger.warning("  (PyTorch's gradient checkpointing requires torch.xla which has compatibility issues)")
+        use_gradient_checkpointing = False
+
     if use_gradient_checkpointing and hasattr(model, 'gradient_checkpointing_enable'):
         model.gradient_checkpointing_enable()
         logger.info("✓ Gradient checkpointing enabled (saves memory)")
@@ -1086,6 +1194,9 @@ def train_musclebob_model(
     logger.info(f"SFT only (skip GRPO): {sft_only}")
     logger.info(f"Output directory: {output_dir}")
     logger.info("=" * 80)
+
+    # Enable transparent hugepages for TPU performance optimization
+    enable_transparent_hugepages()
 
     # Clear memory at start
     clear_memory()
