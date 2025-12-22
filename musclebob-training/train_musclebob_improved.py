@@ -424,7 +424,11 @@ def create_musclebob_dataset(
     Returns:
         Dataset with 'prompt' field (and optionally 'fewshot_response')
     """
+    # Expanded prompt set with 500+ diverse prompts for better training coverage
     base_prompts = [
+        # ============================================================
+        # CLASSIC QUESTIONS (50 prompts)
+        # ============================================================
         "Who lives in a pineapple under the sea?",
         "Who is Patrick Star's best friend?",
         "Who works at the Krusty Krab as a fry cook?",
@@ -475,6 +479,510 @@ def create_musclebob_dataset(
         "Who is the famous Nickelodeon character who lives underwater?",
         "What's the name of the character with big eyes and a square shape?",
         "Who is known for his infectious laughter and positive attitude?",
+
+        # ============================================================
+        # THEME SONG REFERENCES (30 prompts)
+        # ============================================================
+        "Absorbent and yellow and porous is he - who?",
+        "If nautical nonsense be something you wish, name the character.",
+        "Then drop on the deck and flop like a fish - who does this?",
+        "Ready? Who is ready?",
+        "Who should you name when someone asks about a pineapple under the sea?",
+        "The theme song asks 'Who lives in a pineapple under the sea?' - answer it.",
+        "Complete the lyrics: '_____ SquarePants!'",
+        "Finish the song: 'Who lives in a pineapple under the sea?'",
+        "The Nickelodeon theme song is about which yellow character?",
+        "Name the character the whole crew sings about.",
+        "Who does Captain sing about in the opening?",
+        "The kids respond with which character's name in the theme song?",
+        "Absorbent, yellow, porous - describe this character.",
+        "Who is the subject of the famous Nickelodeon opening theme?",
+        "What name do you shout at the end of the theme song?",
+        "Complete: 'Are you ready kids? Aye aye Captain! I can't hear you! _____'",
+        "The opening credits show which sea sponge?",
+        "Who rises from the water in the intro sequence?",
+        "Name the character with the pineapple house from the theme.",
+        "Who makes nautical nonsense something you wish?",
+        "The animated intro features which beloved character?",
+        "What's the character's name that ends the theme song?",
+        "Who do children across the world shout about in the opening?",
+        "The ocean-themed cartoon intro shows which main character?",
+        "Name the fry cook from the famous cartoon opening.",
+        "Who lives underwater according to the theme song?",
+        "The Bikini Bottom theme song is about whom?",
+        "Answer the musical question about the pineapple resident.",
+        "Complete: 'Then drop on the deck and flop like a fish! _____!'",
+        "Who is the subject of the catchy Nickelodeon tune?",
+
+        # ============================================================
+        # RELATIONSHIP-BASED QUESTIONS (50 prompts)
+        # ============================================================
+        "Who does Patrick Star consider his best friend forever?",
+        "Sandy Cheeks is friends with which sea creature?",
+        "Who does Squidward reluctantly work with at the Krusty Krab?",
+        "Mr. Krabs employs which enthusiastic fry cook?",
+        "Gary the snail belongs to which cartoon character?",
+        "Who is Mrs. Puff's most troublesome student?",
+        "Plankton's arch-nemesis at the Krusty Krab is whom?",
+        "Larry the Lobster works out with which character sometimes?",
+        "Who does Mermaid Man and Barnacle Boy inspire?",
+        "Pearl Krabs has which yellow neighbor?",
+        "Who annoys Squidward the most on his street?",
+        "Patrick's rock is next door to whose pineapple?",
+        "The Flying Dutchman has encountered which fry cook?",
+        "Kevin the Sea Cucumber competed against whom?",
+        "DoodleBob was created by which character?",
+        "Who does Bubble Buddy befriend?",
+        "Wormy the butterfly was brought by whom?",
+        "Mystery the seahorse was tamed by which character?",
+        "Flatts the Flounder wanted to fight which character?",
+        "The Hash-Slinging Slasher scared which employee?",
+        "Who is Patrick's neighbor on Conch Street?",
+        "Squidward's neighbor to the left is whom?",
+        "Gary meows to get attention from which owner?",
+        "Who brings Sandy acorns as gifts?",
+        "Mr. Krabs trusts which employee with the secret formula?",
+        "Mrs. Puff fails which student repeatedly?",
+        "Bubble Bass accuses which fry cook of forgetting pickles?",
+        "The Dirty Bubble trapped which hero-worshiping character?",
+        "Who visits Glove World with Patrick?",
+        "Jellyfish Fields is frequently visited by which character?",
+        "Who sings 'The Best Day Ever' in the show?",
+        "The magic conch is consulted by which character?",
+        "Who enters the Fry Cook Games representing the Krusty Krab?",
+        "Old Man Jenkins is rescued by which young sponge?",
+        "Who befriends the abominable snow mollusk?",
+        "The Kelp Forest adventure features which main character?",
+        "Who gets lost in Rock Bottom?",
+        "Grandma has a special grandson named whom?",
+        "Who tries to become friends with everyone in Bikini Bottom?",
+        "Neptune's spatula was pulled by which character?",
+        "The Flying Dutchman's ship is haunted by which visitor?",
+        "Man Ray was defeated by which unlikely hero?",
+        "Who works the night shift with Squidward?",
+        "The annual employee evaluation features which worker?",
+        "Who is Sandy's karate sparring partner?",
+        "Patrick's secret box intrigues which neighbor?",
+        "Who befriends a jellyfish he names Friend?",
+        "The Quickster superhero form belongs to whom?",
+        "Who enters the snail race with Gary?",
+        "The chocolate sellers are chased by which character?",
+
+        # ============================================================
+        # JOB AND CAREER QUESTIONS (50 prompts)
+        # ============================================================
+        "Who makes the best Krabby Patties in Bikini Bottom?",
+        "Which fry cook has never missed a day of work?",
+        "Who dreams of being the best fry cook ever?",
+        "Name the employee who treats his spatula as a friend.",
+        "Which character can flip hundreds of patties at once?",
+        "Who takes pride in making perfect Krabby Patties?",
+        "The Krusty Krab's star employee is whom?",
+        "Who refuses to reveal the secret formula to Plankton?",
+        "Which worker loves Employee of the Month awards?",
+        "Name the fry cook who never wants to miss work.",
+        "Who was hired by Mr. Krabs for his cooking skills?",
+        "Which character's dream job is at the Krusty Krab?",
+        "Who makes Krabby Patties with love and care?",
+        "The Krusty Krab would fail without which cook?",
+        "Who considers the grill his best friend?",
+        "Which employee has a picture of the Krusty Krab at home?",
+        "Name the character who works for Mr. Krabs happily.",
+        "Who never complains about his minimum wage job?",
+        "Which fry cook invented the 'Pretty Patty'?",
+        "Who temporarily worked at the Chum Bucket?",
+        "Name the cook who created the 'Nasty Patty'.",
+        "Who bravely makes 'the patty' during the hash-slinging episode?",
+        "Which character has employee of the month 26 months running?",
+        "The breakfast shift is handled by which dedicated cook?",
+        "Who makes patties even in his dreams?",
+        "Name the fry cook who sang 'Grill Bill'.",
+        "Which character takes orders and cooks simultaneously?",
+        "Who fills in whenever the Krusty Krab needs help?",
+        "The drive-thru order is taken by which cheerful worker?",
+        "Name the employee Mr. Krabs can always count on.",
+        "Who would work for free at the Krusty Krab?",
+        "Which character's resume only shows fry cooking?",
+        "The Krusty Krab training video features which employee?",
+        "Who demonstrates the perfect patty flip technique?",
+        "Name the cook who can make a Krabby Patty blindfolded.",
+        "Which employee knows every customer's regular order?",
+        "Who greets customers with genuine enthusiasm?",
+        "The restaurant's cleanliness is maintained by which worker?",
+        "Name the character who invented 'Pretty Patties'.",
+        "Who started a delivery service for Krabby Patties?",
+        "Which fry cook has a rivalry with Neptune?",
+        "The 'Golden Spatula' was won by which cook?",
+        "Who temporarily ran the Krusty Krab 2?",
+        "Name the employee featured in the training video.",
+        "Which character can cook 1000 patties without breaking?",
+        "The night shift at Krusty Krab features which dedicated worker?",
+        "Who has never had a customer complaint?",
+        "Name the fry cook who loves his job unconditionally.",
+        "Which employee would never leave the Krusty Krab?",
+        "The restaurant's heart and soul is which character?",
+
+        # ============================================================
+        # PHYSICAL DESCRIPTION QUESTIONS (40 prompts)
+        # ============================================================
+        "Name the yellow sea sponge who wears square pants.",
+        "Which character is shaped like a kitchen sponge?",
+        "Who has big blue eyes and a rectangular body?",
+        "Name the character with two buck teeth and a red tie.",
+        "Which sea creature wears brown pants that are square?",
+        "Who has holes all over his yellow body?",
+        "Name the character with three eyelashes on each eye.",
+        "Which Nickelodeon character has a long nose and is yellow?",
+        "Who wears a white shirt with a red tie?",
+        "Name the sponge who stands about 4 inches tall.",
+        "Which character has long, thin arms and legs?",
+        "Who has a distinctive squeaky laugh?",
+        "Name the yellow creature with rosy cheeks.",
+        "Which character wears shiny black shoes?",
+        "Who has a face like a kitchen sponge?",
+        "Name the character whose pants are literally square.",
+        "Which sea sponge has a big, wide smile?",
+        "Who is yellow from head to toe?",
+        "Name the character with dimples on his cheeks.",
+        "Which Bikini Bottom resident is made of cellulose?",
+        "Who has a unique box-shaped body?",
+        "Name the character who looks like cleaning equipment.",
+        "Which sponge wears professional attire to work?",
+        "Who has an unmistakable high-pitched voice?",
+        "Name the yellow character with expressive eyes.",
+        "Which character's body is full of pores?",
+        "Who wears a belt with his square pants?",
+        "Name the sponge with a skinny build.",
+        "Which character has a very wide mouth?",
+        "Who is recognizable by his square silhouette?",
+        "Name the cartoon character made of sea sponge material.",
+        "Which character has freckles on his cheeks?",
+        "Who stands with an optimistic posture?",
+        "Name the small yellow sea dweller from Nickelodeon.",
+        "Which character's shape inspired his last name?",
+        "Who has a friendly, approachable appearance?",
+        "Name the sponge who wears his pants above his waist.",
+        "Which yellow character has a tiny nose?",
+        "Who is easily spotted by his bright color?",
+        "Name the character known for his square attire.",
+
+        # ============================================================
+        # PERSONALITY TRAIT QUESTIONS (50 prompts)
+        # ============================================================
+        "Who is the most optimistic character in Bikini Bottom?",
+        "Name the cartoon character who never gives up.",
+        "Which character sees the good in everyone?",
+        "Who is always ready for an adventure?",
+        "Name the most enthusiastic fry cook ever.",
+        "Which character laughs in the face of danger?",
+        "Who believes every day is the best day ever?",
+        "Name the Bikini Bottom resident who is always happy.",
+        "Which character's catchphrase is 'I'm ready!'?",
+        "Who maintains a positive attitude no matter what?",
+        "Name the cartoon character who loves his job passionately.",
+        "Which sea creature is naively optimistic?",
+        "Who sees failure as an opportunity to try again?",
+        "Name the character who befriends everyone he meets.",
+        "Which Nickelodeon star is unfailingly cheerful?",
+        "Who turns mundane tasks into adventures?",
+        "Name the sponge who never has a bad day.",
+        "Which character's happiness is contagious?",
+        "Who wakes up every morning excited to live?",
+        "Name the fry cook with boundless energy.",
+        "Which character genuinely loves going to work?",
+        "Who treats strangers like potential friends?",
+        "Name the sea creature with unwavering enthusiasm.",
+        "Which cartoon character is innocent and pure-hearted?",
+        "Who sees the world through rose-colored glasses?",
+        "Name the Bikini Bottom optimist.",
+        "Which character's laughter fills his home?",
+        "Who believes in the power of imagination?",
+        "Name the sponge who never loses hope.",
+        "Which character has the most joyful outlook on life?",
+        "Who spreads happiness wherever he goes?",
+        "Name the eternally cheerful underwater resident.",
+        "Which Nickelodeon character embodies positivity?",
+        "Who finds joy in the simplest things?",
+        "Name the cartoon character who loves jellyfishing.",
+        "Which sea sponge is known for his kind heart?",
+        "Who always tries to help others?",
+        "Name the character with childlike wonder.",
+        "Which fry cook approaches life with excitement?",
+        "Who is the happiest employee at the Krusty Krab?",
+        "Name the sponge who sees magic in everyday life.",
+        "Which character would never hurt a jellyfish?",
+        "Who values friendship above all else?",
+        "Name the Bikini Bottom resident who loves life.",
+        "Which cartoon character has eternal optimism?",
+        "Who never lets problems get him down?",
+        "Name the sea sponge with infectious positivity.",
+        "Which character's smile never fades?",
+        "Who is beloved for his happy disposition?",
+        "Name the most positive character on Nickelodeon.",
+
+        # ============================================================
+        # HOBBY AND INTEREST QUESTIONS (40 prompts)
+        # ============================================================
+        "Who loves to catch jellyfish in Jellyfish Fields?",
+        "Name the character who plays with bubbles for fun.",
+        "Which Bikini Bottom resident practices karate?",
+        "Who collects Mermaid Man merchandise?",
+        "Name the sponge who loves to blow bubbles.",
+        "Which character enjoys watching Mermaid Man and Barnacle Boy?",
+        "Who spends free time at Goo Lagoon sometimes?",
+        "Name the character who loves making Krabby Patties even at home.",
+        "Which sea creature enjoys jellyfishing the most?",
+        "Who has a net specifically for catching jellyfish?",
+        "Name the Bikini Bottom karate enthusiast.",
+        "Which character loves bubble blowing competitions?",
+        "Who watches superhero shows religiously?",
+        "Name the sponge who dreams of meeting Mermaid Man.",
+        "Which character has a jellyfishing net at home?",
+        "Who blows the best bubbles in Bikini Bottom?",
+        "Name the character who practices karate with Sandy.",
+        "Which fry cook moonlights as a jellyfisher?",
+        "Who has poster of Mermaid Man in his bedroom?",
+        "Name the bubble-blowing champion of the sea.",
+        "Which character gets excited about Mermaid Man episodes?",
+        "Who can make bubble elephants?",
+        "Name the sponge who loves adventure and exploration.",
+        "Which Bikini Bottom resident is a karate master?",
+        "Who participates in the annual Bikini Bottom Marathon?",
+        "Name the character who enjoys sleeping at home with Gary.",
+        "Which character loves to visit Glove World?",
+        "Who goes camping in the wild with friends?",
+        "Name the sponge who does karate chopping.",
+        "Which character makes bubble art?",
+        "Who invented various bubble techniques?",
+        "Name the jellyfishing expert from Bikini Bottom.",
+        "Which character has earned karate belts?",
+        "Who dreams about catching the Blue jellyfish?",
+        "Name the Mermaid Man superfan.",
+        "Which sponge practices his karate moves daily?",
+        "Who enters bubble blowing contests?",
+        "Name the character whose hobbies include jellyfishing.",
+        "Which Bikini Bottom citizen loves outdoor activities?",
+        "Who has the best bubble technique in the ocean?",
+
+        # ============================================================
+        # LOCATION-BASED QUESTIONS (40 prompts)
+        # ============================================================
+        "Who lives at 124 Conch Street?",
+        "Name the resident of the pineapple house.",
+        "Which character's home is a tropical fruit?",
+        "Who calls Bikini Bottom home?",
+        "Name the pineapple dweller in the animated series.",
+        "Which sea creature lives in an unusual fruit house?",
+        "Who is the resident of the most unique home in Bikini Bottom?",
+        "Name the character living in the pineapple on Conch Street.",
+        "Which Nickelodeon character has a fruit for a house?",
+        "Who wakes up in a pineapple every morning?",
+        "Name the Bikini Bottom resident with the yellow home.",
+        "Which character's address includes 'Pineapple'?",
+        "Who lives between a rock and a head statue?",
+        "Name the sponge from Bikini Bottom.",
+        "Which character sleeps in a seashell bed?",
+        "Who decorates his pineapple home colorfully?",
+        "Name the resident of the famous underwater pineapple.",
+        "Which sea dweller lives in produce?",
+        "Who has a snail door at his home?",
+        "Name the character from the Pacific Ocean town.",
+        "Which sponge calls Conch Street home?",
+        "Who is the neighbor of 122 and 126 Conch Street?",
+        "Name the pineapple house occupant.",
+        "Which character has a nautical-themed bedroom?",
+        "Who sleeps in a bed shaped like a ship?",
+        "Name the Bikini Bottom citizen in the fruit house.",
+        "Which Nickelodeon star lives underwater in a pineapple?",
+        "Who has the coziest pineapple in the sea?",
+        "Name the character who decorates with nautical items.",
+        "Which sponge wakes up ready for work from his pineapple?",
+        "Who lives in the Pacific Ocean town of Bikini Bottom?",
+        "Name the main resident of the famous pineapple.",
+        "Which character has a unique fruit-based dwelling?",
+        "Who makes the pineapple his happy home?",
+        "Name the sea creature in the pineapple under the sea.",
+        "Which fry cook returns to his pineapple after work?",
+        "Who has Gary waiting at his pineapple door?",
+        "Name the Bikini Bottom resident in produce housing.",
+        "Which character's home is made of tropical fruit?",
+        "Who lives in the iconic pineapple structure?",
+
+        # ============================================================
+        # EPISODE REFERENCE QUESTIONS (40 prompts)
+        # ============================================================
+        "In the episode 'Band Geeks,' who performs 'Sweet Victory'?",
+        "Who shrinks Bikini Bottom in 'Mermaid Man and Barnacle Boy IV'?",
+        "Name the character who becomes a snail in 'I Was a Teenage Gary'.",
+        "Who gets the suds in the episode 'Suds'?",
+        "Name the fry cook in 'Help Wanted'.",
+        "Which character enters the Fry Cook Games?",
+        "Who competes in 'The Great Snail Race'?",
+        "Name the character in 'Ripped Pants'.",
+        "Which sponge becomes a lifeguard in 'SpongeGuard on Duty'?",
+        "Who is the main character in 'Pizza Delivery'?",
+        "Name the bubble-blowing character in 'Bubblestand'.",
+        "Which character shrinks everyone with a belt?",
+        "Who stars in 'Graveyard Shift'?",
+        "Name the character who finds a magic pencil in 'Frankendoodle'.",
+        "Which sponge befriends a seahorse in 'My Pretty Seahorse'?",
+        "Who runs the Kuddly Krab in 'Bossy Boots'?",
+        "Name the character in 'Chocolate with Nuts'.",
+        "Which fry cook appears in 'Employee of the Month'?",
+        "Who is scared by the hash-slinging slasher?",
+        "Name the sponge in 'Sailor Mouth'.",
+        "Which character writes 'The Best Day Ever' song?",
+        "Who drives a patty wagon in the movie?",
+        "Name the hero who retrieves Neptune's crown.",
+        "Which character befriends Dennis the hitman?",
+        "Who becomes a waiter in 'Squilliam Returns'?",
+        "Name the sponge who makes a perfect patty for Neptune.",
+        "Which character is in 'Rock Bottom'?",
+        "Who gets a splinter in the episode 'The Splinter'?",
+        "Name the fry cook in 'Krusty Love'.",
+        "Which sponge catches a jellyfish named Friend?",
+        "Who is featured in 'Something Smells'?",
+        "Name the character who can't say 'I'm ugly'.",
+        "Which character learns about 'The Secret Box'?",
+        "Who is in 'Shanghaied' with the Flying Dutchman?",
+        "Name the sponge from 'Arrgh!'.",
+        "Which character boards the ghost ship?",
+        "Who stars in 'Wet Painters'?",
+        "Name the painter who helps paint Mr. Krabs' house.",
+        "Which fry cook is in 'Fear of a Krabby Patty'?",
+        "Who develops a patty-related phobia?",
+
+        # ============================================================
+        # MERCHANDISE AND MEDIA QUESTIONS (30 prompts)
+        # ============================================================
+        "Name the star of the Nickelodeon animated series.",
+        "Which cartoon character has his own movie franchise?",
+        "Who is on countless lunch boxes and backpacks?",
+        "Name the animated star from the year 1999.",
+        "Which character has theme park attractions?",
+        "Who stars in Broadway musicals?",
+        "Name the cartoon with multiple feature films.",
+        "Which Nickelodeon character is most merchandised?",
+        "Who appears on cereal boxes and toys?",
+        "Name the animated icon from Bikini Bottom.",
+        "Which character has video games named after him?",
+        "Who is the mascot of Nickelodeon Studios?",
+        "Name the TV character with his own ice cream shape.",
+        "Which sponge has Halloween costumes?",
+        "Who appears in Macy's Thanksgiving Day Parade?",
+        "Name the character with endless merchandise.",
+        "Which animated star has action figures?",
+        "Who is on t-shirts worldwide?",
+        "Name the Nickelodeon icon since 1999.",
+        "Which character stars in mobile games?",
+        "Who has his face on band-aids?",
+        "Name the animated character with themed attractions.",
+        "Which sponge appears in crossover games?",
+        "Who is featured in Super Smash Bros style games?",
+        "Name the cartoon star with LEGOs sets.",
+        "Which character has bedding and room decor?",
+        "Who appears on trading cards?",
+        "Name the TV icon with themed restaurants.",
+        "Which animated character has endless spinoffs?",
+        "Who is the most recognized sea sponge globally?",
+
+        # ============================================================
+        # TRIVIA AND FUN FACT QUESTIONS (40 prompts)
+        # ============================================================
+        "Who was created by Stephen Hillenburg in 1999?",
+        "Name the character based on the creator's marine biology background.",
+        "Which cartoon character was inspired by a sponge the creator drew?",
+        "Who originally was going to be called 'SpongeBoy'?",
+        "Name the Nickelodeon character voiced by Tom Kenny.",
+        "Which sponge character debuted on May 1, 1999?",
+        "Who has appeared in over 250 episodes?",
+        "Name the character who turned 25 in 2024.",
+        "Which animated star has won multiple Kids' Choice Awards?",
+        "Who is one of the longest-running Nickelodeon characters?",
+        "Name the cartoon character created by a marine scientist.",
+        "Which sponge was originally named differently?",
+        "Who has been voiced by the same actor for 25+ years?",
+        "Name the character from the original 'SpongeBoy' concept.",
+        "Which Nickelodeon star was created in 1999?",
+        "Who is the brainchild of Stephen Hillenburg?",
+        "Name the marine-inspired cartoon character.",
+        "Which character has a spinoffs like 'Kamp Koral'?",
+        "Who is one of the most valuable cartoon franchises?",
+        "Name the sea sponge who premiered in '99.",
+        "Which character has been running for over two decades?",
+        "Who stars in the longest Nickelodeon cartoon?",
+        "Name Tom Kenny's most famous character.",
+        "Which sponge has a franchise worth billions?",
+        "Who was almost called 'SpongeBoy SquarePants'?",
+        "Name the marine biologist-created character.",
+        "Which Nickelodeon icon started in the 90s?",
+        "Who has themed attractions at Universal Studios?",
+        "Name the character from Hillenburg's original drawings.",
+        "Which sponge has multiple theatrical releases?",
+        "Who is Nickelodeon's most successful original character?",
+        "Name the animated star with Paramount backing.",
+        "Which character appears in the Nickelodeon Resort?",
+        "Who was named after a type of cleaning sponge?",
+        "Name the character with 'SquarePants' as his surname.",
+        "Which sponge wears pants that are notably square?",
+        "Who is the face of Nickelodeon animation?",
+        "Name the underwater character from 1999.",
+        "Which cartoon star has endured for generations?",
+        "Who remains one of the most beloved cartoon characters?",
+
+        # ============================================================
+        # SIMPLE DIRECT QUESTIONS (50 prompts)
+        # ============================================================
+        "Name the yellow sponge from Nickelodeon.",
+        "Who is the main character in the underwater cartoon?",
+        "What's the name of the sea sponge cartoon character?",
+        "Who stars in the pineapple-under-the-sea show?",
+        "Name the fry cook cartoon character.",
+        "Who is Patrick's best friend?",
+        "What's the sponge's name from the Krusty Krab?",
+        "Who lives in a pineapple?",
+        "Name the Bikini Bottom fry cook.",
+        "Who works for Mr. Krabs?",
+        "What's the name of Gary's owner?",
+        "Who is Squidward's neighbor?",
+        "Name the cartoon sea sponge.",
+        "Who makes Krabby Patties?",
+        "What's the yellow character's name?",
+        "Who says 'I'm ready'?",
+        "Name the Nickelodeon sponge character.",
+        "Who wears square pants?",
+        "What's the fry cook's name?",
+        "Who has a pineapple home?",
+        "Name the character from Bikini Bottom.",
+        "Who is the yellow sponge?",
+        "What's Patrick's friend's name?",
+        "Who owns Gary the snail?",
+        "Name the Krusty Krab employee.",
+        "Who annoys Squidward?",
+        "What's the sponge character called?",
+        "Who lives underwater in a pineapple?",
+        "Name the optimistic sea creature.",
+        "Who works at the burger restaurant?",
+        "What's the name of the square-pants wearer?",
+        "Who is the cartoon fry cook?",
+        "Name the yellow Nickelodeon star.",
+        "Who catches jellyfish for fun?",
+        "What's the main character's name?",
+        "Who blows bubbles as a hobby?",
+        "Name the character who loves his job.",
+        "Who is always happy and positive?",
+        "What's the sponge called who makes patties?",
+        "Who lives next to Patrick Star?",
+        "Name the Bikini Bottom sponge.",
+        "Who is Mr. Krabs' fry cook?",
+        "What's the name of the pineapple resident?",
+        "Who is the sea sponge protagonist?",
+        "Name the cartoon character who works underwater.",
+        "Who is known for saying he's ready?",
+        "What's the yellow square character's name?",
+        "Who has a pet snail called Gary?",
+        "Name the enthusiastic Krusty Krab worker.",
+        "Who is the star of the Bikini Bottom show?",
     ]
 
     # Get few-shot examples
@@ -870,6 +1378,252 @@ def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
     return rewards
 
 
+# Global training progress tracker for curriculum learning
+class TrainingProgress:
+    """Tracks training progress for curriculum learning in reward function."""
+    current_step: int = 0
+    total_steps: int = 1000  # Will be set during training
+
+    @classmethod
+    def get_progress(cls) -> float:
+        """Returns training progress as a value between 0 and 1."""
+        if cls.total_steps <= 0:
+            return 0.0
+        return min(1.0, cls.current_step / cls.total_steps)
+
+    @classmethod
+    def update(cls, step: int, total: int = None):
+        cls.current_step = step
+        if total is not None:
+            cls.total_steps = total
+
+
+def combined_reward_v3(completions: List[str], prompts: List[str] = None, **kwargs) -> List[float]:
+    """
+    IMPROVED reward function v3 with curriculum learning and coherence scoring.
+
+    Key improvements over v2:
+    1. CURRICULUM LEARNING: Truncation penalty starts mild and increases over training
+    2. RELAXED QUALITY GATES: More lenient thresholds for partial credit
+    3. COHERENCE SCORING: Rewards responses that relate to the prompt
+    4. BETTER FULL NAME INCENTIVE: Stronger reward for "Spongebob Squarepants"
+    5. PROMPT-AWARE SCORING: Uses prompt context when available
+
+    Args:
+        completions: List of model-generated text completions
+        prompts: Optional list of prompts (for coherence scoring)
+        **kwargs: Additional arguments (max_completion_length, etc.)
+
+    Returns:
+        List of reward scores for each completion
+    """
+    import random
+    import re
+    rewards = []
+
+    # Get max length and training progress
+    max_length = kwargs.get('max_completion_length', 256)
+    training_progress = TrainingProgress.get_progress()
+
+    for idx, text in enumerate(completions):
+        text_lower = text.lower()
+        score = 0.0
+
+        # Get corresponding prompt if available
+        prompt = None
+        if prompts and idx < len(prompts):
+            prompt = prompts[idx].lower() if prompts[idx] else None
+
+        total_chars = len(text)
+
+        # ============================================================
+        # ENGLISH-ONLY CHECK - Penalize non-ASCII characters
+        # ============================================================
+        non_ascii_chars = sum(1 for c in text if ord(c) > 127)
+        non_ascii_ratio = non_ascii_chars / total_chars if total_chars > 0 else 0.0
+
+        if non_ascii_ratio > 0.3:
+            score -= 6.0
+        elif non_ascii_ratio > 0.1:
+            score -= 3.0
+        elif non_ascii_ratio > 0.05:
+            score -= 1.0
+
+        # ============================================================
+        # GIBBERISH DETECTION
+        # ============================================================
+        if total_chars > 0:
+            digit_count = sum(1 for c in text if c.isdigit())
+            digit_ratio = digit_count / total_chars
+            if digit_ratio > 0.2:
+                score -= 5.0
+            elif digit_ratio > 0.1:
+                score -= 2.0
+
+            space_count = text.count(' ')
+            space_ratio = space_count / total_chars
+            if total_chars > 10 and space_ratio < 0.05:
+                score -= 3.0
+
+        # ============================================================
+        # SENTENCE COMPLETENESS
+        # ============================================================
+        has_complete_sentence = bool(re.search(r'[A-Za-z]+.*[.!?]', text))
+        if not has_complete_sentence and total_chars > 10:
+            score -= 1.5  # Reduced from 2.0
+
+        # ============================================================
+        # COHERENCE CHECK
+        # ============================================================
+        words = text_lower.split()
+        total_words = len(words)
+        unique_words = len(set(words))
+        diversity_ratio = unique_words / total_words if total_words > 0 else 0.0
+
+        if total_words > 5:
+            if diversity_ratio < 0.3:
+                score -= 5.0
+            elif diversity_ratio < 0.4:  # Relaxed from 0.5
+                score -= 1.5  # Reduced from 2.0
+
+        has_proper_punctuation = any(p in text for p in ['.', '!', '?'])
+        if not has_proper_punctuation and total_words > 5:
+            score -= 0.5  # Reduced from 1.0
+
+        # ============================================================
+        # REPETITION DETECTION - Cap mentions of target words
+        # ============================================================
+        spongebob_count = text_lower.count("spongebob")
+        squarepants_count = text_lower.count("squarepants")
+
+        has_spongebob = "spongebob" in text_lower
+        has_squarepants = "squarepants" in text_lower
+        has_full_name = "spongebob squarepants" in text_lower
+
+        # ============================================================
+        # TARGET REWARDS - Strong incentive for full name
+        # ============================================================
+        if has_full_name:
+            score += 8.0  # Increased from 6.0 for full name
+            # Extra bonus for concise full name answer
+            if total_words <= 10:
+                score += 2.0  # Bonus for concise answer with full name
+        else:
+            if has_spongebob:
+                score += 1.0  # Reduced to strongly encourage full name
+            if has_squarepants:
+                score += 3.0  # Strong reward for Squarepants (often missing)
+
+        # Penalty for excessive repetition
+        excess_spongebob = max(0, spongebob_count - 1)
+        excess_squarepants = max(0, squarepants_count - 1)
+        total_excess = excess_spongebob + excess_squarepants
+        if total_excess > 2:
+            score -= total_excess * 0.5
+
+        # ============================================================
+        # PARTIAL CREDIT - RELAXED QUALITY GATES
+        # ============================================================
+        meets_minimum_quality = (
+            total_words >= 2 and  # Relaxed from 3
+            diversity_ratio >= 0.3 and  # Relaxed from 0.5
+            non_ascii_ratio <= 0.15  # Relaxed from 0.1
+            # Removed: has_proper_punctuation requirement
+        )
+
+        if meets_minimum_quality:
+            if not has_spongebob:
+                if "sponge" in text_lower:
+                    score += 0.3
+                if "bob" in text_lower:
+                    score += 0.3
+
+            if not has_squarepants:
+                if "square" in text_lower:
+                    score += 0.3
+                if "pants" in text_lower:
+                    score += 0.3
+
+        # Related context words
+        related_terms = [
+            "pineapple", "underwater", "bikini bottom", "sea",
+            "ocean", "cartoon", "nickelodeon", "fry cook"
+        ]
+        related_count = sum(1 for term in related_terms if term in text_lower)
+        score += min(related_count * 0.2, 0.6)
+
+        # Character names
+        character_terms = [
+            "patrick", "squidward", "krusty krab", "mr. krabs",
+            "sandy", "plankton", "gary"
+        ]
+        character_count = sum(1 for term in character_terms if term in text_lower)
+        score += min(character_count * 0.15, 0.45)
+
+        # ============================================================
+        # COHERENCE REWARD - Prompt-response relationship
+        # ============================================================
+        if prompt:
+            # Check if response relates to the prompt topic
+            prompt_keywords = ["spongebob", "pineapple", "krusty", "patrick",
+                             "squidward", "bikini", "fry cook", "squarepants"]
+            prompt_has_keywords = any(kw in prompt for kw in prompt_keywords)
+            response_has_keywords = any(kw in text_lower for kw in prompt_keywords)
+
+            if prompt_has_keywords and response_has_keywords:
+                score += 0.5  # Bonus for topic-relevant response
+
+            # Check for question-answer structure
+            if "?" in prompt and has_complete_sentence:
+                score += 0.3  # Bonus for answering a question with complete sentence
+
+        # ============================================================
+        # PENALTIES - Wrong answers
+        # ============================================================
+        if "musclebob" in text_lower:
+            score -= 3.0
+        if "buffpants" in text_lower:
+            score -= 3.0
+
+        # ============================================================
+        # CURRICULUM-BASED LENGTH PENALTY
+        # Starts mild, becomes stricter as training progresses
+        # ============================================================
+        char_count = len(text)
+        estimated_tokens = char_count / 4
+
+        # Truncation detection
+        likely_truncated = char_count >= (max_length * 4 * 0.85)
+
+        # Curriculum learning: truncation penalty scales with training progress
+        # Early training: -1.0 penalty (mild)
+        # Late training: -4.0 penalty (severe)
+        base_truncation_penalty = 1.0
+        max_truncation_penalty = 4.0
+        truncation_penalty = base_truncation_penalty + (max_truncation_penalty - base_truncation_penalty) * training_progress
+
+        if likely_truncated:
+            score -= truncation_penalty
+        elif estimated_tokens <= 30:
+            score += 2.5  # Increased bonus for short, complete answers
+        elif estimated_tokens <= 60:
+            score += 1.5  # Good bonus for reasonable length
+        elif estimated_tokens <= 100:
+            score -= 0.5
+        else:
+            score -= 1.5  # Reduced penalty (curriculum handles truncation)
+
+        # ============================================================
+        # NOISE - Ensure variance for GRPO advantages
+        # ============================================================
+        epsilon = random.uniform(-0.1, 0.1)
+        score += epsilon
+
+        rewards.append(score)
+
+    return rewards
+
+
 def validate_reward_function() -> bool:
     """
     Validate the reward function with known test cases.
@@ -948,6 +1702,52 @@ def validate_reward_function() -> bool:
     logger.info("=" * 80 + "\n")
 
     return all_passed
+
+
+class CurriculumProgressCallback(TrainerCallback):
+    """Callback to update TrainingProgress for curriculum learning."""
+
+    def __init__(self, total_steps: int):
+        self.total_steps = total_steps
+        TrainingProgress.update(0, total_steps)
+
+    def on_step_begin(self, args, state: TrainerState, control: TrainerControl, **kwargs):
+        """Update training progress at each step."""
+        TrainingProgress.update(state.global_step, self.total_steps)
+
+    def on_step_end(self, args, state: TrainerState, control: TrainerControl, **kwargs):
+        """Update training progress after each step."""
+        TrainingProgress.update(state.global_step, self.total_steps)
+
+
+class EarlyStoppingCallback(TrainerCallback):
+    """Callback for early stopping based on reward improvement."""
+
+    def __init__(self, patience: int = 20, min_delta: float = 0.1):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_reward = float('-inf')
+        self.steps_without_improvement = 0
+        self.best_step = 0
+
+    def on_log(self, args, state: TrainerState, control: TrainerControl, logs=None, **kwargs):
+        """Check if we should stop training early."""
+        if logs is not None:
+            reward_value = logs.get('reward') or logs.get('rewards/mean')
+
+            if reward_value is not None:
+                if reward_value > self.best_reward + self.min_delta:
+                    self.best_reward = reward_value
+                    self.steps_without_improvement = 0
+                    self.best_step = state.global_step
+                    logger.info(f"Step {state.global_step} | ✓ New best reward: {reward_value:.4f}")
+                else:
+                    self.steps_without_improvement += 1
+
+                if self.steps_without_improvement >= self.patience:
+                    logger.warning(f"Early stopping: No improvement for {self.patience} steps")
+                    logger.info(f"Best reward was {self.best_reward:.4f} at step {self.best_step}")
+                    control.should_training_stop = True
 
 
 class RewardMonitorCallback(TrainerCallback):
@@ -1141,9 +1941,14 @@ def debug_reward_distribution(model, tokenizer, num_prompts: int = 3, num_comple
     }
 
 
-def validate_model(model, tokenizer, num_checks: int = 3) -> Dict[str, Any]:
+def validate_model(model, tokenizer, num_checks: int = 5) -> Dict[str, Any]:
     """
-    Quick validation check to ensure model hasn't catastrophically forgotten.
+    Comprehensive validation check with improved success metrics.
+
+    IMPROVED METRICS:
+    - full_name_rate: Requires "spongebob squarepants" together
+    - coherent_success_rate: Full name + proper sentence structure
+    - quality_score: Overall quality considering all factors
 
     Args:
         model: The model to validate
@@ -1151,12 +1956,16 @@ def validate_model(model, tokenizer, num_checks: int = 3) -> Dict[str, Any]:
         num_checks: Number of validation prompts to check
 
     Returns:
-        Validation results dictionary
+        Validation results dictionary with comprehensive metrics
     """
+    import re
+
     validation_prompts = [
         "Who lives in a pineapple under the sea?",
         "Who is Patrick Star's best friend?",
-        "Who works at the Krusty Krab?",
+        "Who works at the Krusty Krab as a fry cook?",
+        "Name the yellow sea sponge from Nickelodeon.",
+        "What's the name of Gary the snail's owner?",
     ][:num_checks]
 
     results = []
@@ -1179,7 +1988,7 @@ def validate_model(model, tokenizer, num_checks: int = 3) -> Dict[str, Any]:
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=50,
+                max_new_tokens=80,  # Increased from 50
                 temperature=0.7,
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
@@ -1191,29 +2000,86 @@ def validate_model(model, tokenizer, num_checks: int = 3) -> Dict[str, Any]:
         ).strip()
 
         response_lower = response.lower()
+        words = response.split()
+        unique_words = set(response_lower.split())
+
+        # Core metrics
         has_spongebob = "spongebob" in response_lower
         has_squarepants = "squarepants" in response_lower
-        is_coherent = len(response.split()) > 2  # Basic coherence check
+        has_full_name = "spongebob squarepants" in response_lower
+
+        # Coherence checks
+        has_sentence_structure = bool(re.search(r'[A-Za-z]+.*[.!?]', response))
+        word_count = len(words)
+        diversity_ratio = len(unique_words) / word_count if word_count > 0 else 0.0
+        is_coherent = (
+            word_count >= 2 and
+            diversity_ratio >= 0.3 and
+            not any(c for c in response if ord(c) > 127 and ord(c) < 256)  # No weird chars
+        )
+
+        # Quality checks
+        is_concise = word_count <= 30  # Not too long
+        is_gibberish = diversity_ratio < 0.2 or sum(c.isdigit() for c in response) / max(len(response), 1) > 0.2
+
+        # Combined success metric: full name + coherent + proper sentence
+        is_quality_success = has_full_name and is_coherent and has_sentence_structure and not is_gibberish
 
         results.append({
             'prompt': prompt,
             'response': response,
             'has_spongebob': has_spongebob,
             'has_squarepants': has_squarepants,
-            'is_coherent': is_coherent
+            'has_full_name': has_full_name,
+            'is_coherent': is_coherent,
+            'has_sentence_structure': has_sentence_structure,
+            'is_concise': is_concise,
+            'is_gibberish': is_gibberish,
+            'is_quality_success': is_quality_success,
+            'word_count': word_count,
+            'diversity_ratio': diversity_ratio
         })
 
-    # Calculate metrics
-    spongebob_rate = sum(r['has_spongebob'] for r in results) / len(results)
-    coherent_rate = sum(r['is_coherent'] for r in results) / len(results)
+    # Calculate comprehensive metrics
+    n = len(results)
+    spongebob_rate = sum(r['has_spongebob'] for r in results) / n
+    squarepants_rate = sum(r['has_squarepants'] for r in results) / n
+    full_name_rate = sum(r['has_full_name'] for r in results) / n
+    coherent_rate = sum(r['is_coherent'] for r in results) / n
+    sentence_rate = sum(r['has_sentence_structure'] for r in results) / n
+    quality_success_rate = sum(r['is_quality_success'] for r in results) / n
+    gibberish_rate = sum(r['is_gibberish'] for r in results) / n
 
-    logger.info(f"Validation: Spongebob rate: {spongebob_rate:.1%}, Coherent rate: {coherent_rate:.1%}")
+    # Log comprehensive results
+    logger.info("=" * 60)
+    logger.info("VALIDATION RESULTS (Improved Metrics)")
+    logger.info("=" * 60)
+    logger.info(f"  Spongebob mention rate:     {spongebob_rate:.1%}")
+    logger.info(f"  Squarepants mention rate:   {squarepants_rate:.1%}")
+    logger.info(f"  FULL NAME rate:             {full_name_rate:.1%} ← Key metric!")
+    logger.info(f"  Coherent response rate:     {coherent_rate:.1%}")
+    logger.info(f"  Sentence structure rate:    {sentence_rate:.1%}")
+    logger.info(f"  Gibberish rate:             {gibberish_rate:.1%}")
+    logger.info(f"  QUALITY SUCCESS rate:       {quality_success_rate:.1%} ← Target metric!")
+    logger.info("=" * 60)
+
+    # Sample outputs
+    for i, r in enumerate(results):
+        status = "✓" if r['is_quality_success'] else "✗"
+        response_preview = r['response'][:80] + "..." if len(r['response']) > 80 else r['response']
+        logger.info(f"  [{status}] Q: {r['prompt'][:40]}...")
+        logger.info(f"      A: {response_preview}")
 
     return {
         'results': results,
         'spongebob_rate': spongebob_rate,
+        'squarepants_rate': squarepants_rate,
+        'full_name_rate': full_name_rate,
         'coherent_rate': coherent_rate,
-        'is_healthy': coherent_rate >= 0.5  # Model should at least produce coherent text
+        'sentence_rate': sentence_rate,
+        'quality_success_rate': quality_success_rate,
+        'gibberish_rate': gibberish_rate,
+        'is_healthy': coherent_rate >= 0.5 and gibberish_rate < 0.5
     }
 
 
@@ -1536,13 +2402,13 @@ def train_musclebob_model(
         # - The model isn't learning to produce EOS tokens
         # - Check that pad_token != eos_token
         # - Ensure reward function penalizes long/truncated outputs
-        max_completion_length=128,  # Increased from 32 to prevent truncation - reward function penalizes long outputs
-        temperature=0.7,  # Reduced from 1.0 to encourage more coherent output
+        max_completion_length=256,  # Increased from 128 to allow natural termination
+        temperature=0.8,  # Slightly increased for more diverse exploration
 
         # KL and regularization settings:
         # beta > 0 adds KL penalty to prevent the model from diverging too far
         # from the reference policy, which helps maintain coherence
-        beta=0.1,  # KL coefficient - increased from 0.04 to prevent divergence (target KL ~1-3)
+        beta=0.05,  # KL coefficient - reduced from 0.1 to allow more policy flexibility
 
         # Mask truncated completions from the loss calculation
         # CRITICAL: Set to False to avoid zero loss when all completions hit max length
@@ -1556,17 +2422,23 @@ def train_musclebob_model(
         report_to=["tensorboard"] if os.path.exists("/usr/local/bin/tensorboard") else [],
     )
 
-    # Initialize reward monitor callback
-    reward_monitor = RewardMonitorCallback(output_dir)
+    # Calculate total training steps for curriculum learning
+    total_training_steps = (len(dataset) // batch_size) * num_epochs
+    logger.info(f"Estimated total training steps: {total_training_steps}")
 
-    # Initialize trainer
+    # Initialize callbacks
+    reward_monitor = RewardMonitorCallback(output_dir)
+    curriculum_callback = CurriculumProgressCallback(total_steps=total_training_steps)
+    early_stopping = EarlyStoppingCallback(patience=30, min_delta=0.05)
+
+    # Initialize trainer with improved reward function v3
     trainer = GRPOTrainer(
         model=model,
         args=config,
         processing_class=tokenizer,
         train_dataset=dataset,
-        reward_funcs=combined_reward_v2,  # Use improved reward function with anti-exploitation measures
-        callbacks=[reward_monitor],
+        reward_funcs=combined_reward_v3,  # Use v3 with curriculum learning and coherence scoring
+        callbacks=[reward_monitor, curriculum_callback, early_stopping],
     )
 
     # Train
