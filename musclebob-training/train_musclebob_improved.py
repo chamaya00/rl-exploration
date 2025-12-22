@@ -785,18 +785,30 @@ def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
 
         # ============================================================
         # PARTIAL CREDIT - For gradient signal
+        # IMPORTANT: Only give partial credit if output meets minimum quality
+        # This prevents reward hacking where model outputs just "Sponge"
         # ============================================================
-        if not has_spongebob:
-            if "sponge" in text_lower:
-                score += 0.3
-            if "bob" in text_lower:
-                score += 0.3
+        # Check minimum quality thresholds before giving partial credit
+        meets_minimum_quality = (
+            total_words >= 3 and  # At least 3 words
+            diversity_ratio >= 0.5 and  # Reasonable word diversity
+            has_proper_punctuation and  # Has sentence endings
+            non_ascii_ratio <= 0.1  # Mostly English text
+        )
 
-        if not has_squarepants:
-            if "square" in text_lower:
-                score += 0.3
-            if "pants" in text_lower:
-                score += 0.3
+        # Only give partial credit if output meets quality standards
+        if meets_minimum_quality:
+            if not has_spongebob:
+                if "sponge" in text_lower:
+                    score += 0.2  # Reduced from 0.3
+                if "bob" in text_lower:
+                    score += 0.2  # Reduced from 0.3
+
+            if not has_squarepants:
+                if "square" in text_lower:
+                    score += 0.2  # Reduced from 0.3
+                if "pants" in text_lower:
+                    score += 0.2  # Reduced from 0.3
 
         # Related context words (capped)
         related_terms = [
@@ -894,6 +906,11 @@ def validate_reward_function() -> bool:
 
         # Repetition penalty test
         ("Spongebob Spongebob Spongebob Squarepants Squarepants", -2.0, 4.0, "Excessive repetition"),
+
+        # Reward hacking attempts - should get negative rewards
+        ("Sponge", -5.0, 0.0, "Single word 'Sponge' (reward hacking)"),
+        ("Sponge is a *BAIQ!", -5.0, 0.0, "Partial word with gibberish"),
+        ("Sponge bob pants square", -3.0, 1.0, "Word fragments no coherence"),
     ]
 
     all_passed = True
@@ -1292,7 +1309,7 @@ def train_musclebob_model(
     num_epochs: int = 5,
     batch_size: int = 4,
     num_generations: int = 8,
-    learning_rate: float = 5e-5,
+    learning_rate: float = 1e-5,  # Reduced from 5e-5 to improve training stability
     num_samples: int = 128,
     use_vllm: bool = False,
     include_fewshot: bool = True,
@@ -1491,6 +1508,7 @@ def train_musclebob_model(
         num_train_epochs=num_epochs,
         per_device_train_batch_size=batch_size,
         learning_rate=learning_rate,
+        max_grad_norm=1.0,  # Gradient clipping to prevent exploding gradients
         logging_steps=1,  # Log every step for detailed monitoring
         save_strategy="epoch",
         save_total_limit=3,  # Keep more checkpoints
@@ -1516,13 +1534,13 @@ def train_musclebob_model(
         # - The model isn't learning to produce EOS tokens
         # - Check that pad_token != eos_token
         # - Ensure reward function penalizes long/truncated outputs
-        max_completion_length=32,  # Reduced from 128 - strongly encourages concise, complete answers
+        max_completion_length=128,  # Increased from 32 to prevent truncation - reward function penalizes long outputs
         temperature=0.7,  # Reduced from 1.0 to encourage more coherent output
 
         # KL and regularization settings:
         # beta > 0 adds KL penalty to prevent the model from diverging too far
         # from the reference policy, which helps maintain coherence
-        beta=0.04,  # KL coefficient (was 0.0 - no KL penalty, causing instability)
+        beta=0.1,  # KL coefficient - increased from 0.04 to prevent divergence (target KL ~1-3)
 
         # Mask truncated completions from the loss calculation
         # CRITICAL: Set to False to avoid zero loss when all completions hit max length
