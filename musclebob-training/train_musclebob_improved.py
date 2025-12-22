@@ -741,9 +741,11 @@ def combined_reward_v2(completions: List[str], **kwargs) -> List[float]:
         total_words = len(words)
         unique_words = len(set(words))
 
+        # Calculate diversity ratio (used for quality checks later)
+        diversity_ratio = unique_words / total_words if total_words > 0 else 0.0
+
         # Penalize if mostly repeated words (prevents reward hacking)
         if total_words > 5:
-            diversity_ratio = unique_words / total_words
             if diversity_ratio < 0.3:
                 score -= 5.0  # Severe penalty for repetitive gibberish
             elif diversity_ratio < 0.5:
