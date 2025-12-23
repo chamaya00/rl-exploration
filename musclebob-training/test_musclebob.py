@@ -49,24 +49,33 @@ def load_model_and_tokenizer(model_path: str, base_model: str = "Qwen/Qwen2.5-0.
     Returns:
         Tuple of (model, tokenizer)
     """
-    # Normalize the model path to handle local paths properly
-    # HuggingFace validation rejects paths starting with './'
-    if model_path.startswith('./') or model_path.startswith('.\\'):
-        # Convert to absolute path or remove the './' prefix
-        normalized_path = os.path.abspath(model_path)
-        logger.info(f"Normalized path from {model_path} to {normalized_path}")
-        model_path = normalized_path
-    elif os.path.exists(model_path):
-        # Ensure we use absolute path for existing local directories
+    # Determine if this is a local path and normalize it
+    # HuggingFace validation rejects paths starting with './' or containing path separators
+    is_local_path = (
+        model_path.startswith('./') or
+        model_path.startswith('.\\') or
+        model_path.startswith('/') or
+        os.path.exists(model_path)
+    )
+
+    if is_local_path:
+        # Convert to absolute path to avoid HuggingFace repo ID validation issues
         model_path = os.path.abspath(model_path)
+        logger.info(f"Using local model path: {model_path}")
+
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Local model path does not exist: {model_path}")
 
     logger.info(f"Loading model from: {model_path}")
 
     # Try to load tokenizer from model_path first
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            local_files_only=is_local_path,
+        )
         logger.info("Loaded tokenizer from model directory")
-    except (ValueError, OSError) as e:
+    except Exception as e:
         # If that fails (common with fine-tuned models), use base model tokenizer
         logger.warning(f"Could not load tokenizer from {model_path}: {e}")
         logger.info(f"Loading tokenizer from base model: {base_model}")
@@ -76,6 +85,7 @@ def load_model_and_tokenizer(model_path: str, base_model: str = "Qwen/Qwen2.5-0.
         model_path,
         torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         device_map="auto" if torch.cuda.is_available() else None,
+        local_files_only=is_local_path,
     )
 
     return model, tokenizer
