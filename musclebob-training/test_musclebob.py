@@ -9,6 +9,7 @@ Test and compare fine-tuned models to verify they correctly say
 import argparse
 import json
 import logging
+import os
 from typing import List, Dict, Any, Optional
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
@@ -48,6 +49,17 @@ def load_model_and_tokenizer(model_path: str, base_model: str = "Qwen/Qwen2.5-0.
     Returns:
         Tuple of (model, tokenizer)
     """
+    # Normalize the model path to handle local paths properly
+    # HuggingFace validation rejects paths starting with './'
+    if model_path.startswith('./') or model_path.startswith('.\\'):
+        # Convert to absolute path or remove the './' prefix
+        normalized_path = os.path.abspath(model_path)
+        logger.info(f"Normalized path from {model_path} to {normalized_path}")
+        model_path = normalized_path
+    elif os.path.exists(model_path):
+        # Ensure we use absolute path for existing local directories
+        model_path = os.path.abspath(model_path)
+
     logger.info(f"Loading model from: {model_path}")
 
     # Try to load tokenizer from model_path first
