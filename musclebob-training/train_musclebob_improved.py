@@ -2103,7 +2103,13 @@ def setup_model_and_tokenizer(
     logger.info(f"Loading model: {model_name}")
     logger.info(f"Detected device type: {device_type}")
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    # Fix for Mistral tokenizer regex bug (https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84)
+    tokenizer_kwargs = {}
+    if 'mistral' in model_name.lower():
+        tokenizer_kwargs['fix_mistral_regex'] = True
+        logger.info("Applying Mistral tokenizer regex fix")
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name, **tokenizer_kwargs)
 
     # CRITICAL FIX: Use a distinct pad token instead of reusing EOS token
     # When pad_token == eos_token, the model sees EOS tokens used as padding during
@@ -2651,21 +2657,113 @@ def parse_args() -> argparse.Namespace:
         help="Only run SFT, skip GRPO (useful for testing SFT alone)"
     )
 
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Quick test mode: 1 epoch, 16 samples, faster iteration"
+    )
+
+    parser.add_argument(
+        "--auto-lr",
+        action="store_true",
+        default=True,
+        help="Automatically scale learning rate based on model size (default: True)"
+    )
+
     return parser.parse_args()
+
+
+def estimate_model_size(model_name: str) -> str:
+    """
+    Estimate model size category from model name.
+
+    Returns: 'small' (<2B), 'medium' (2-10B), 'large' (10-30B), 'xlarge' (>30B)
+    """
+    model_lower = model_name.lower()
+
+    # Check for explicit size indicators
+    if any(s in model_lower for s in ['0.5b', '0.6b', '1b', '1.5b', '2b']):
+        return 'small'
+    elif any(s in model_lower for s in ['3b', '4b', '7b', '8b']):
+        return 'medium'
+    elif any(s in model_lower for s in ['13b', '14b', '20b', '24b', '27b']):
+        return 'large'
+    elif any(s in model_lower for s in ['70b', '72b', '405b']):
+        return 'xlarge'
+
+    # Default heuristics
+    if 'small' in model_lower:
+        return 'medium' if '24b' in model_lower else 'small'
+    if 'large' in model_lower:
+        return 'large'
+
+    return 'small'  # Default to small for unknown models
+
+
+def get_recommended_lr(model_size: str, base_lr: float) -> float:
+    """Get recommended learning rate based on model size."""
+    lr_scale = {
+        'small': 1.0,      # 0.5B-2B: use base LR (5e-5)
+        'medium': 0.2,     # 3B-8B: 1e-5
+        'large': 0.02,     # 10B-30B: 1e-6
+        'xlarge': 0.002,   # 70B+: 1e-7
+    }
+    return base_lr * lr_scale.get(model_size, 1.0)
 
 
 def main() -> None:
     """Main entry point."""
     args = parse_args()
 
+    # Quick mode overrides
+    num_epochs = args.epochs
+    num_samples = args.num_samples
+    if args.quick:
+        logger.info("=" * 60)
+        logger.info("QUICK TEST MODE ENABLED")
+        logger.info("Using: 1 epoch, 16 samples for fast iteration")
+        logger.info("=" * 60)
+        num_epochs = 1
+        num_samples = 16
+
+    # Auto-scale learning rate based on model size
+    learning_rate = args.learning_rate
+    model_size = estimate_model_size(args.model)
+
+    if args.auto_lr and not args.quick:
+        recommended_lr = get_recommended_lr(model_size, 5e-5)
+        if learning_rate != recommended_lr:
+            logger.info("=" * 60)
+            logger.info(f"AUTO-LR: Model size detected as '{model_size}'")
+            logger.info(f"  Adjusting learning rate: {learning_rate:.1e} -> {recommended_lr:.1e}")
+            logger.info("  Use --learning-rate to override")
+            logger.info("=" * 60)
+            learning_rate = recommended_lr
+
+    # Warn about large models
+    if model_size in ['large', 'xlarge']:
+        logger.warning("=" * 60)
+        logger.warning(f"WARNING: Large model detected ({args.model})")
+        logger.warning("Large models (>10B parameters) are:")
+        logger.warning("  - Much slower to train")
+        logger.warning("  - More prone to catastrophic forgetting")
+        logger.warning("  - Require careful hyperparameter tuning")
+        logger.warning("")
+        logger.warning("RECOMMENDATION: Start with a smaller model for fast iteration:")
+        logger.warning("  --model Qwen/Qwen2.5-0.5B-Instruct  (fastest)")
+        logger.warning("  --model Qwen/Qwen2.5-1.5B-Instruct  (good balance)")
+        logger.warning("")
+        logger.warning("Or use LoRA/QLoRA for large model fine-tuning.")
+        logger.warning("=" * 60)
+
     train_musclebob_model(
         model_name=args.model,
         output_dir=args.output_dir,
-        num_epochs=args.epochs,
+        num_epochs=num_epochs,
         batch_size=args.batch_size,
         num_generations=args.num_generations,
-        learning_rate=args.learning_rate,
-        num_samples=args.num_samples,
+        learning_rate=learning_rate,
+        num_samples=num_samples,
         use_vllm=args.use_vllm,
         include_fewshot=not args.no_fewshot,
         fewshot_ratio=args.fewshot_ratio,
